@@ -1,0 +1,4 @@
+variable,description,variable type,unit
+spcode,"USDA species code, see table 1 in README for full species name and more informaton",string,NA
+rep,"replicate code, unique for each sample from the same species",string,NA
+biomass,"oven-dried biomass for single leaf, used for calculating SLA",numeric,gram
