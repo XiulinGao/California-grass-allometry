@@ -1,0 +1,10 @@
+variable,description,variable type,unit
+spcode,species code using USDA code. See table 1 in README for full name,string,NA
+rep,replicate code. Unique for each sample from the same species,string,NA
+date,measurement date,M/D/YY,NA
+dia_base1,"diameter measured at the base of each plant, perpendicular to dia_base2",numeric,cm
+dia_base2,"diameter measured at the base of each plant, perpendicular to dia_base1",,cm
+dia_can1,"diameter measured at the canopy of each plant, perpendicular to dia_can2",,cm
+dia_can2,"diameter measured at the canopy of each plant, perpendicular to dia_can1",,cm
+height,maximum plant height including inflorecense,,cm
+length,"plant length when streched, include inflorecense",,cm

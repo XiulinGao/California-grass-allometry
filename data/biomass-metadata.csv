@@ -1,0 +1,6 @@
+variable,description,variable type,unit
+spcode,"species code using USDA code, details see README.md Table 1",string,NA
+rep,"replicate code. Code to distinguish replicates within species, unique for each samples from the same species",string,NA
+organ,"name of plant organ, so we know which plant part is the biomass measurement from",string,NA
+biomass,oven-dried biomass of each plant organ,numeric,gram
+extra.stem,extra stem biomass attached to some root samples,numetric,gram
