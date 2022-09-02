@@ -1,0 +1,9 @@
+variable,description,variable type,unit
+spcode,"USDA species code, see table 1 in README for full species name and more informaton",string,NA
+rep,"replicate code, unique for each sample from the same species",string,NA
+dia_base1,diameter measured at base of a stem,numeric,mm
+dia_base2,diameter measured perpendicular to dia_base1,numeric,mm
+dia_can1,diameter measured at canopy of a stem,numeric,mm
+dia_can2,diameter measured perpendicular to dia_can1,numeric,mm
+length,length of the measured stem section,numeric,cm
+mass,"oven-dried biomass for single stem, used for calculating SSA",numeric,gram
