@@ -265,7 +265,7 @@ allom_stem <- function(df){
 }
 
 allom_rot <- function(df){
-  lm(root ~ leaf_c, data=df)
+  lm(root ~ leaf, data=df)
 }
 
 allom_ca <- function(df){
