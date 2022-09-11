@@ -1,265 +1,285 @@
-#grass-allometry.R
+## grass-allometry.R
 
 ## fit allometry model for 12 California grasses
+## 1. model selection to find the best allometry model for each organ
+## 2. test some allometry hypotheses 
 
 library(tidyverse)
-library(RColorBrewer)
-require(wesanderson)
 library(lmtest)
-#library(ggplot2)
-#library(poweRlaw)
-
-source("./ggplot-theme.R")
-
-mass <- read.csv("../data/biomass.csv", stringsAsFactors = FALSE)
-size <- read.csv("../data/plant-size.csv", stringsAsFactors = FALSE)
-sp <- read.csv("../data/species.csv",stringsAsFactors = FALSE)
-  
-  
-mass <- mass %>%  mutate(id = paste(spcode, rep, sep="-"))
-
-mass_wide <- mass %>% 
-  pivot_wider(names_from = organ, values_from = biomass)
+library(lme4)
+library(car)
+library(emmeans)
 
 
-mass_wide <- mass_wide %>% group_by(spcode, rep,id) %>% 
-  mutate(stem  = sum(stem, extra_stem, na.rm=TRUE),
-         agb   = sum(stem, leaf, repro, na.rm=TRUE),
-         tmass = sum(agb,root, na.rm=TRUE))%>% ungroup() %>% 
-  dplyr::select(-extra_stem)
 
-size <- size %>% mutate(id = paste(spcode, rep, sep="-"))
-size <- size %>% dplyr::select(-date) %>% group_by(spcode, rep, id) %>% 
-  mutate(dia_base = mean(dia_base1, dia_base2),
-         dia_can = mean(dia_can1, dia_can2)) %>% ungroup()
 g_2_kg = 0.001
 cm2_2_m2 = 0.0001
 cm_2_m = 0.01
 mass_2_C = 2
 kg_2_g = 1000
-
-all <- mass_wide %>% left_join(size, by = c("spcode", "rep","id"))
-all <- all %>% mutate(carea   = pi*(dia_can*dia_can/4),
-                      carea2  = (dia_can1*dia_can2*pi)/400)
-all <- all %>% mutate(height     = height*cm_2_m,
-                      stem       = stem*g_2_kg,
-                      stem_c     = stem*mass_2_C,
-                      root       = root*g_2_kg,
-                      root_c     = root*mass_2_C,
-                      leaf       = leaf*g_2_kg,
-                      leaf_c     = leaf*mass_2_C,
-                      repro      = repro*g_2_kg,
-                      repro_c    = repro*mass_2_C,
-                      agb        = agb*g_2_kg,
-                      agb_c      = agb*mass_2_C,
-                      tmass      = tmass*g_2_kg,
-                      tmass_c    = tmass*mass_2_C,
-                      carea      = carea*cm2_2_m2,
-                      cradius    = dia_can/2,
-                      lf2rt      = root_c/leaf_c,
-                      seed_alloc = repro_c/tmass_c)
-all <- all %>% left_join(sp, by="spcode")
+wooden = 0.001
+day2sec = 86400
 
 
-all_log <- all %>% mutate(across(c("stem","stem_c","root","root_c",
-                                   "leaf","leaf_c","repro","repro_c",
-                                   "agb","agb_c","dia_base","dia_can",
-                                   "length","height","carea","carea2"),
-                           ~log(.x)))
-## some overall plots
-
-ggplot(all_log, aes(leaf, stem)) + geom_point() +
-  facet_wrap(.~spcode, ncol = 4) + 
-  labs(x = "Log leaf biomass",
-       y = "Log stem biomass") +
-  prestheme +
-  theme(axis.text.x=element_text(angle=90, vjust=0.5))
-
-ggsave("../results/lf-sm-sp-log.jpeg", width = 16, height=14, unit = "cm",
-       dpi=300)  
-
-ggplot(all_log, aes(leaf, stem,colour=species)) + geom_point() +
-  labs(x = "Log leaf biomass",
-       y = "Log stem biomass")+
-  scale_color_brewer(palette="Paired") + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"),
-        axis.text.x=element_text(angle=90, vjust=0.5))  
-
-ggsave("../results/lf-sm-all-log.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)                        
-
-ggplot(all_log, aes(dia_base, height, color = species)) + geom_point() +
-  labs(x = "Log basal diameter",
-       y = "Log height") +
-  scale_color_brewer(palette="Paired") + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"),
-        axis.text.x=element_text(angle=90, vjust=0.5))
-
-ggsave("../results/ba-hgt-all-log.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)
-
-ggplot(all_log, aes(dia_base, height)) + geom_point()+
-  facet_wrap(.~spcode,ncol=4)+
-  labs(x = "Log basal diameter",
-       y = "Log height") +
-  prestheme +
-  theme(axis.text.x=element_text(angle=90, vjust=0.5))
-
-ggsave("../results/ba-hgt-sp-log.jpeg", width = 16, height=14, unit = "cm",
-       dpi=300) 
-
-
-ggplot(all_log, aes(dia_base, leaf, color = photo)) + geom_point() +
-  labs(x = "Log basal diameter",
-       y = "Log leaf biomass") + 
-  scale_color_manual(values=schwilkcolors[1:2]) +
-  prestheme +
-   theme(legend.title=element_blank(),
-        legend.position="bottom")
+mass <- read.csv("../data/biomass.csv",    stringsAsFactors = FALSE)
+size <- read.csv("../data/plant-size.csv", stringsAsFactors = FALSE)
+sp   <- read.csv("../data/species.csv",    stringsAsFactors = FALSE)
   
+  
+mass <- mass                                                        %>%  
+        mutate(id = paste(spcode, rep, sep="-"))
 
-ggsave("../results/ba-lf-photo-log.jpeg", width = 10, height=8, unit = "cm",
-       dpi=300) 
-
-### subset data to annuals
-
-anuals <- all_log %>% filter(growth=="annual")
-c3anual <- anuals %>% filter(photo=="C3")
-
-## determine species effects first
-
-null_lf    <- lm(leaf_c ~ dia_base, data=c3anual)
-full_lf     <- lm(leaf_c ~ dia_base*spcode, data=c3anual)
-#sp_lf   <- lm(leaf_c ~ dia_base + spcode, data=c3anual)
-lrtest(null_lf, full_lf) #basal diameter effect on leafC vary between species
-
-ggplot(c3anual, aes(dia_base, leaf_c, color = short)) + geom_point() +
-  labs(x = "Log basal diameter",
-       y = "Log leaf carbon") +
-  geom_smooth(method="lm", se=FALSE)+
-  geom_abline(slope=1.91512,intercept=-7.92442, color="black", size=1.5, linetype="dashed")+
-  scale_color_manual(values=schwilkcolors[1:4]) + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"))
-
-ggsave("../results/lfmod-c3annual.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)
-
-### leaf-root
-null_rt    <- lm(root_c ~ leaf_c, data=c3anual)
-full_rt     <- lm(root_c ~ leaf_c*spcode, data=c3anual)
-#sp_rt   <- lm(root_c ~ leaf_c + spcode, data=c3anual)
-lrtest(null_rt, full_rt) #basal diameter effect on leafC vary between species
-anova(full_rt)
-ggplot(c3anual, aes(leaf_c, root_c, color = short)) + geom_point() +
-  labs(x = "Log leaf carbon",
-       y = "Log root carbon") +
-  geom_smooth(method="lm", se=FALSE)+
-  geom_abline(slope=0.90775,intercept=-0.52793, color="black", size=1.5, linetype="dashed")+
-  scale_color_manual(values=schwilkcolors[1:4]) + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"))
-
-ggsave("../results/rtmod-c3annual.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)
+mass_wide <- mass                                                   %>% 
+             pivot_wider(names_from = organ, values_from = biomass)
 
 
-## leaf-stem biomass
-null_sm    <- lm(stem_c ~ leaf_c, data=c3anual)
-full_sm     <- lm(stem_c ~ leaf_c*spcode, data=c3anual)
+mass_wide <- mass_wide                                              %>% 
+             group_by(spcode, rep,id)                               %>% 
+             mutate(stem  = sum(stem, extra_stem, na.rm=TRUE)
+                   ,agb   = sum(stem, leaf, repro, na.rm=TRUE)
+                   ,tmass = sum(agb,root, na.rm=TRUE))              %>% 
+             ungroup()                                              %>% 
+             dplyr::select(-extra_stem)
 
-lrtest(null_sm, full_sm) #basal diameter effect on leafC vary between species
-anova(full_sm)
-ggplot(c3anual, aes(leaf_c, stem_c, color = short)) + geom_point() +
-  labs(x = "Log leaf carbon",
-       y = "Log stem carbon") +
-  geom_smooth(method="lm", se=FALSE)+
-  geom_abline(slope=1.22508,intercept=0.92215, color="black", size=1.5, linetype="dashed")+
-  scale_color_manual(values=schwilkcolors[1:4]) + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"))
-
-ggsave("../results/smmod-c3annual.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)
-
-## basal diameter-canopy area
-null_ca    <- lm(carea ~ dia_base, data=c3anual)
-full_ca     <- lm(carea ~ dia_base*spcode, data=c3anual)
-lrtest(null_ca, full_ca)
-
-ggplot(c3anual, aes(dia_base, carea, color = short)) + geom_point() +
-  labs(x = "Log basal diameter",
-       y = "Log canopy area") +
-  geom_smooth(method="lm", se=FALSE)+
-  geom_abline(slope=1.2435,intercept=-3.9323, color="black", size=1.5, linetype="dashed")+
-  scale_color_manual(values=schwilkcolors[1:4]) + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"))
-
-ggsave("../results/camod-c3annual.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)
-
-## basal diameter-height
-null_hgt    <- lm(height ~ dia_base, data=c3anual)
-full_hgt     <- lm(height ~ dia_base*spcode, data=c3anual)
-lrtest(null_hgt, full_hgt)
-
-ggplot(c3anual, aes(dia_base, height, color = short)) + geom_point() +
-  labs(x = "Log basal diameter",
-       y = "Log height") +
-  geom_smooth(method="lm", se=FALSE)+
-  geom_abline(slope=0.69951,intercept=-2.09103, color="black", size=1.5, linetype="dashed")+
-  scale_color_manual(values=schwilkcolors[1:4]) + 
-  prestheme                            +
-  theme(legend.title=element_blank(),
-        legend.position="right",
-        legend.text=element_text(size = 14, face="italic"))
-
-ggsave("../results/hgtmod-c3annual.jpeg", width = 14, height=10, unit = "cm",
-       dpi=300)
+size <- size                                        %>% 
+        mutate(id = paste(spcode, rep, sep="-"))    %>% 
+        group_by(spcode,rep,id)                     %>% 
+        mutate(dia_base = mean(dia_base1,dia_base2)
+              ,dia_can  = mean(dia_can1,dia_can2  ) 
+              ,date     = lubridate::mdy(date)    ) %>% 
+        ungroup()
 
 
+all <- mass_wide                                            %>% 
+       left_join(size, by = c("spcode", "rep","id"))        %>% 
+       left_join(sp,   by =   "spcode")
+        
+all <- all                                                  %>% 
+       mutate(carea      = pi*(dia_can*dia_can/4  )
+             ,barea      = pi*(dia_base*dia_base/4)      
+             ,height     = height*cm_2_m
+             ,stem       = stem*g_2_kg
+             ,stem_c     = stem*mass_2_C
+             ,root       = root*g_2_kg
+             ,root_c     = root*mass_2_C
+             ,leaf       = leaf*g_2_kg
+             ,leaf_c     = leaf*mass_2_C
+             ,repro      = repro*g_2_kg
+             ,repro_c    = repro*mass_2_C
+             ,agb        = agb*g_2_kg
+             ,agb_c      = agb*mass_2_C
+             ,tmass      = tmass*g_2_kg
+             ,tmass_c    = tmass*mass_2_C
+             ,barea      = barea*cm2_2_m2
+             ,carea      = carea*cm2_2_m2
+             ,cradius    = dia_can/2
+             ,lf2rt      = root_c/leaf_c
+             ,agb2rt     = root_c/agb_c
+             ,seed_alloc = repro_c/agb_c
+             ,lf2sm      = stem_c/leaf_c
+             ,ca2ba      = barea/carea)
+
+
+all_log <- all                                                  %>% 
+           mutate(across(c("stem","stem_c","root","root_c"    , 
+                           "leaf","leaf_c","repro","repro_c"  ,
+                           "agb","agb_c","tmass","tmass_c"    ,
+                           "dia_base","dia_can","length"      ,
+                           "height","barea","carea","lf2sm"   ,
+                           "ca2ba")                           ,
+                           ~log(.x)))
+
+
+####### 1. Allometry model selection and species-specific variation #######
+
+#### 1a.height allometry model ####
+
+hgt_null  <- lm(height ~ dia_base, all_log)
+hgt_full  <- lm(height ~ dia_base*spcode,all_log)
+AIC(hgt_null,hgt_full)
+hgt_poshoc  <- emmeans(hgt_full, pairwise ~ dia_base*spcode)
+
+
+hgt_allom <- hgt_full
+summary(hgt_allom)
+anova(hgt_allom)
+
+#### 1b.canopy area allometry ####
+
+ca_null1  <- lm(carea ~ dia_base + height, all_log)
+ca_null2  <- lm(carea ~ dia_base, all_log)
+ca_null3  <- lm(carea ~ height, all_log)
+ca_full1  <- lm(carea ~ (dia_base + height)*spcode, all_log)
+ca_full2  <- lm(carea ~ dia_base*spcode, all_log)
+ca_full3  <- lm(carea ~ height*spcode, all_log)
+AIC(ca_null1,ca_null2,ca_null3,ca_full1,ca_full2,ca_full3)
+ca_poshoc <- emmeans(ca_full1, pairwise ~ dia_base:height:spcode)
+ca_poshoc
+
+ca_allom <- ca_full1
+summary(ca_allom)
+anova(ca_allom)
+
+####1c. leaf allometry ####
+lf_null1  <- lm(leaf ~ dia_base, all_log)
+lf_null2  <- lm(leaf ~ dia_base + height, all_log)
+lf_null3  <- lm(leaf ~ height, all_log)
+lf_full1  <- lm(leaf ~ dia_base*spcode, all_log)
+lf_full2  <- lm(leaf ~ (dia_base + height)*spcode,all_log)
+lf_full3  <- lm(leaf ~ height*spcode, all_log)
+AIC(lf_null1,lf_null2,lf_null3,lf_full1,lf_full2,lf_full3)
+
+lf_allom  <- lf_full2
+anova(lf_allom)
+summary(lf_allom)
+lf_poshoc <- emmeans(lf_allom, pairwise ~ dia_base:height:spcode)
+lf_poshoc
+plot(lf_poshoc)
+
+#### 1d.stem allometry ####
+sm_null1 <- lm(stem ~ dia_base, all_log)
+sm_null2 <- lm(stem ~ height, all_log)
+sm_null3 <- lm(stem ~ dia_base + height, all_log)
+sm_full1 <- lm(stem ~ dia_base*spcode, all_log)
+sm_full2 <- lm(stem ~ height*spcode, all_log)
+sm_full3 <- lm(stem ~ (dia_base + height)*spcode, all_log)
+AIC(sm_null1,sm_null2,sm_null3,sm_full1,sm_full2,sm_full3)
+
+sm_allom <- sm_full3
+summary(sm_allom)
+anova(sm_allom)
+sm_poshoc <- emmeans(sm_allom,pairwise ~ dia_base:height:spcode)
+sm_poshoc
+plot(sm_poshoc)
+
+#### 1e. root allometry ####
+rt_null1 <- lm(root ~ leaf,all_log)
+rt_null2 <- lm(root ~ agb, all_log)
+rt_null3 <- lm(root ~ dia_base, all_log)
+rt_full1 <- lm(root ~ leaf*spcode,all_log)
+rt_full2 <- lm(root ~ agb*spcode,all_log)
+rt_full3 <- lm(root ~ dia_base*spcode,all_log)
+AIC(rt_null1,rt_null2,rt_null3,rt_full1,rt_full2,rt_full3)
+
+rt_allom <- rt_full1
+summary(rt_allom)
+anova(rt_allom)
+rt_poshoc <- emmeans(rt_allom,pairwise ~ leaf:spcode)
+rt_poshoc
+plot(rt_poshoc)
+
+####### 2.Hypothesis testing #######
+
+#### 2a. root allocation is greater in perennial and C4 plants #### 
+
+
+frt_hmod <- lmer(root ~ leaf*growth*photo + (1|spcode)
+                 , data = all_log
+                 , REML = TRUE)
+
+summary(frt_hmod)
+Anova(frt_hmod,method="3",test.statistic = "F") 
+
+## perennial plants allocate more to below-ground than annual plants 
+## at the higher end of leaf biomass, might be ontogenetic effect.
+
+
+
+####### H2: fast growlers invest more in reproduction #######
+
+## growth rate
+
+growth <- function(df){
+  lm(agb ~ lagday, data=df) 
+}
+
+grow_df   <- all_log                                                %>% 
+             group_by(spcode)                                       %>% 
+             mutate(lagsec = as.numeric(difftime(date,min(date)))
+                   ,lagday = lagsec/day2sec
+                   ,lagday = ifelse(lagday==0,1,lagday-1))          %>% 
+             select(-lagsec)                                        %>% 
+             ungroup()
+  
+grow_df   <- grow_df                                     %>% 
+             group_by(spcode)                            %>% 
+             nest()                                      %>% 
+             mutate(grow_mod = map(data,growth))
+
+grow_df   <- grow_df                                      %>% 
+             mutate(stat = map(grow_mod,broom::glance))   %>% 
+             unnest(stat)
+
+grow_df   <- grow_df                                      %>% 
+             mutate(mod_tidy = map(grow_mod,broom::tidy)) %>% 
+             unnest(mod_tidy,names_sep="_")               
+
+grow_coef <- grow_df                          %>% 
+             filter(mod_tidy_term =="lagday") %>% 
+             select(spcode
+                   ,mod_tidy_estimate)        %>% 
+             rename(grate = mod_tidy_estimate)
+
+repro_df   <- all                                                    %>% 
+              filter(!is.na(seed_alloc))                             %>%
+              left_join(grow_coef,by="spcode")                       %>%
+              group_by(spcode)                                       %>% 
+              mutate(repro_sd  = sd(seed_alloc)
+                    ,repro_se  = repro_sd/sqrt(length(seed_alloc))
+                    ,repro_ave = mean(seed_alloc))                   %>% 
+              ungroup()                       
+
+                
+
+repro_mod  <- lmer(seed_alloc ~ grate + (1|spcode)
+                   ,data=repro_df
+                   ,REML=TRUE)
+summary(repro_mod)
+Anova(repro_mod) 
+
+repro_fit  <- repro_df                                           %>% 
+              select(-seed_alloc)                                %>% 
+              mutate(seed_alloc = predict(repro_mod,newdata=.))
+# reproduction allocation (as %above-ground biomass)
+# is positively related to growth rate of above-ground biomass
+
+
+######## H3: stem/leaf ratio is influenced by      #######
+####### height (+) and specific leaf area (+)      #######               
+
+
+
+
+
+
+####### Fit species-specific allometry with intercept correction #######
 
 ## define allometry funtions
 
 allom_lf <- function(df){
-  lm(leaf_c ~ dia_base, data=df) 
+  lm(leaf ~ dia_base + height, data=df) 
 }
 
 allom_stem <- function(df){
-  lm(stem_c ~ leaf_c, data=df)
+  lm(stem ~ dia_base + height, data=df)
 }
 
 allom_rot <- function(df){
-  lm(root_c ~ leaf_c, data=df)
+  lm(root ~ leaf_c, data=df)
 }
 
 allom_ca <- function(df){
-  lm(carea ~ dia_base, data=df)
+  lm(carea ~ dia_base + height, data=df)
 }
 
 allom_hgt <- function(df){
   lm(height ~ dia_base, data=df)
 }
 
- 
+
 ## species-specific models 
 
-mod_df <- anuals %>% group_by(spcode) %>% nest()
+mod_df <- all_log %>% group_by(spcode) %>% nest()
 mod_df <- mod_df %>% mutate(lf_mod = map(data, allom_lf),
                             hgt_mod = map(data,allom_hgt),
                             sm_mod = map(data,allom_stem),
@@ -271,6 +291,7 @@ mod_df <- mod_df %>% mutate(lf_mod = map(data, allom_lf),
                             rot_pred = map2(.x=rot_mod, .y=data,~predict(object=.x,newdata=.y)),
                             ca_pred = map2(.x=ca_mod, .y=data,~predict(object=.x,newdata=.y))) 
 
+##glance for model statistic
 mod_df <- mod_df %>% mutate(lf = map(lf_mod,broom::glance),
                             hgt = map(hgt_mod,broom::glance),
                             sm = map(sm_mod, broom::glance),
@@ -286,65 +307,132 @@ mod_df <- mod_df %>% mutate(lf_tidy = map(lf_mod, broom::tidy),
                             ca_tidy = map(ca_mod, broom::tidy))
 
 ## flat model parameter tables
- mod_params <- mod_df %>% select(spcode, data, lf_tidy,hgt_tidy,sm_tidy,rot_tidy,ca_tidy,
-                                 lf_pred,hgt_pred,sm_pred,rot_pred,ca_pred) %>% 
-   unnest(c(lf_tidy,hgt_tidy,sm_tidy,rot_tidy,ca_tidy),names_sep=".")
- 
- 
- 
- params_df <- mod_params %>% unnest(c(data,lf_pred,hgt_pred,sm_pred,rot_pred,ca_pred),keep_empty = TRUE)
- 
- intcpt <- params_df %>% filter(lf_tidy.term=="(Intercept)")
- slope <- params_df %>% filter(lf_tidy.term=="dia_base")
+rthgt_params <- mod_df %>% dplyr::select(spcode,data,hgt_tidy,
+                                       rot_tidy,hgt_pred,rot_pred)          %>% 
+  unnest(c(hgt_tidy,rot_tidy),names_sep=".", keep_empty=TRUE)
 
- slope <- slope %>% select(spcode,short,photo,growth,id,stem_c,root_c,leaf_c,repro_c,agb_c,
-                           sm_pred,rot_pred,lf_pred,hgt_pred,ca_pred,dia_base,
-                          carea,height,lf_tidy.estimate,hgt_tidy.estimate,
-                          sm_tidy.estimate,rot_tidy.estimate,ca_tidy.estimate) %>% 
-  rename(lf_slope = lf_tidy.estimate,
-         hgt_slope = hgt_tidy.estimate,
-         sm_slope = sm_tidy.estimate,
-         rot_slope = rot_tidy.estimate,
-         ca_slope=ca_tidy.estimate)
+lsc_params <- mod_df %>% dplyr::select(spcode, data, sm_tidy,lf_tidy,
+                                       ca_tidy,sm_pred,lf_pred,ca_pred)     %>% 
+  unnest(c(sm_tidy,lf_tidy,ca_tidy),names_sep=".")
 
-intcpt <- intcpt %>% select(spcode,short,photo,growth,id,lf_tidy.estimate,hgt_tidy.estimate,
-                            sm_tidy.estimate,rot_tidy.estimate,ca_tidy.estimate) %>% 
-  rename(lf_incpt = lf_tidy.estimate,
-         hgt_incpt = hgt_tidy.estimate,
-         sm_incpt = sm_tidy.estimate,
-         rot_incpt = rot_tidy.estimate,
+
+rthgt_df <- rthgt_params                               %>% 
+            unnest(c(data,hgt_pred,
+                     rot_pred),
+                  keep_empty = TRUE)
+
+lsc_df  <- lsc_params                                  %>% 
+           unnest(c(data,sm_pred,
+                    lf_pred,ca_pred),
+                  keep_empty = TRUE)
+
+
+rthgt_intcpt <- rthgt_df %>% filter(hgt_tidy.term=="(Intercept)")
+rthgt_slope  <- rthgt_df %>% filter(hgt_tidy.term=="dia_base")
+
+lsc_intcpt <- lsc_df  %>% filter(sm_tidy.term=="(Intercept)")
+lsc_slope <-  lsc_df  %>% filter(sm_tidy.term %in% c("dia_base","height"))
+
+rthgt_slope <- rthgt_slope                             %>% 
+  dplyr::select(spcode,short,photo,growth,id,dia_base,
+                height,root,repro,agb,
+                rot_pred,hgt_pred,
+                hgt_tidy.estimate,rot_tidy.estimate)   %>% 
+         rename(hgt_slope = hgt_tidy.estimate,
+                rot_slope = rot_tidy.estimate)
+
+rthgt_intcpt <- rthgt_intcpt                            %>% 
+                dplyr::select(spcode,short,photo,
+                              growth,id,hgt_tidy.estimate,
+                              rot_tidy.estimate)        %>% 
+                rename(hgt_incpt = hgt_tidy.estimate,
+                       rot_incpt = rot_tidy.estimate)
+
+lsc_slope  <- lsc_slope                                   %>% 
+             dplyr::select(spcode,short,photo,
+                           growth,id,stem,leaf,
+                           carea,sm_pred,lf_pred,
+                           ca_pred,sm_tidy.estimate,
+                           sm_tidy.term,lf_tidy.estimate,
+                           lf_tidy.term,ca_tidy.estimate,
+                           ca_tidy.term)                 %>% 
+  pivot_wider(names_from  = sm_tidy.term,
+              values_from = c(sm_tidy.estimate,
+                              lf_tidy.estimate,
+                              ca_tidy.estimate),
+              names_sep   = ".")                         %>%
+ rename(dbh_sm = sm_tidy.estimate.dia_base,
+        hgt_sm = sm_tidy.estimate.height,
+        dbh_lf = lf_tidy.estimate.dia_base,
+        hgt_lf = lf_tidy.estimate.height,
+        dbh_ca = ca_tidy.estimate.dia_base,
+        hgt_ca = ca_tidy.estimate.height)               %>% 
+  group_by(spcode)                                      %>% 
+  mutate(dbh_sm = unique(dbh_sm[!is.na(dbh_sm)]),
+         hgt_sm = unique(hgt_sm[!is.na(hgt_sm)]),
+         dbh_lf = unique(dbh_lf[!is.na(dbh_lf)]),
+         hgt_lf = unique(hgt_lf[!is.na(hgt_lf)]),
+         dbh_ca = unique(dbh_ca[!is.na(dbh_ca)]),
+         hgt_ca = unique(hgt_ca[!is.na(hgt_ca)]))        %>% 
+  ungroup()                                              %>% 
+  select(-c(lf_tidy.term,ca_tidy.term))                  %>% 
+  distinct()
+
+
+
+  
+
+lsc_intcpt <- lsc_intcpt                                 %>% 
+              dplyr::select(spcode,short,photo,growth,id,
+                            sm_tidy.estimate,
+                            lf_tidy.estimate, 
+                            ca_tidy.estimate)            %>% 
+  rename(sm_incpt =  sm_tidy.estimate,
+         lf_incpt = lf_tidy.estimate,
          ca_incpt = ca_tidy.estimate)
 
-obs_predic <- slope %>% left_join(intcpt, by=c("spcode","short","photo",
-                                               "growth","id")) %>% ungroup()
+lsc_all  = lsc_intcpt                                    %>%  
+           left_join(lsc_slope,by=c("spcode","short",
+                                    "photo","growth","id"))
+
+obs_predic <- rthgt_slope                               %>% 
+              left_join(rthgt_intcpt, 
+                        by=c("spcode","short","photo",
+                             "growth","id"))            %>% 
+              ungroup()
+
+obs_predic <- obs_predic                                %>% 
+              left_join(lsc_all,by=c("spcode","short","photo",
+                                     "growth","id"))    %>% 
+              ungroup()
 
 ## let's correct for intercept, see ref: 
 ## https://www.jstor.org/stable/1937343?seq=1&cid=pdf-reference#references_tab_contents
 
 obs_predic <- obs_predic %>% group_by(spcode) %>% 
-                             mutate(lf_n = length(!is.na(leaf_c)),
-                                    sm_n = length(!is.na(stem_c)),
-                                    rt_n = length(!is.na(root_c)),
-                                    hgt_n = length(!is.na(height)),
-                                    ca_n  = length(!is.na(carea)),
-                                    lf_sme = (leaf_c-lf_pred)*(leaf_c-lf_pred),
-                                    sm_sme = (stem_c-sm_pred)*(stem_c-sm_pred),
-                                    rt_sme = (root_c-rot_pred)*(root_c-rot_pred),
-                                    hgt_sme = (height-hgt_pred)*(height-hgt_pred),
-                                    ca_sme = (carea-ca_pred)*(carea-ca_pred))
-                                    
- obs_predic <- obs_predic %>% mutate(lf_cf = sum(lf_sme, na.rm=TRUE)/(lf_n-2)/2,
-                                     sm_cf = sum(sm_sme,na.rm=TRUE)/(sm_n-2)/2,
-                                     rt_cf = sum(rt_sme, na.rm=TRUE)/(rt_n-2)/2,
-                                     hgt_cf = sum(hgt_sme, na.rm=TRUE)/(hgt_n-2)/2,
-                                     ca_cf = sum(ca_sme, na.rm=TRUE)/(ca_n-2)/2) %>% 
-                                     ungroup()
- 
-  
+  mutate(lf_n = length(!is.na(leaf)),
+         sm_n = length(!is.na(stem)),
+         rt_n = length(!is.na(root)),
+         hgt_n = length(!is.na(height)),
+         ca_n  = length(!is.na(carea)),
+         lf_sme = (leaf-lf_pred)*(leaf-lf_pred),
+         sm_sme = (stem-sm_pred)*(stem-sm_pred),
+         rt_sme = (root-rot_pred)*(root-rot_pred),
+         hgt_sme = (height-hgt_pred)*(height-hgt_pred),
+         ca_sme = (carea-ca_pred)*(carea-ca_pred))
+
+obs_predic <- obs_predic %>% mutate(lf_cf = sum(lf_sme, na.rm=TRUE)/(lf_n-2)/2,
+                                    sm_cf = sum(sm_sme,na.rm=TRUE)/(sm_n-3)/2,
+                                    rt_cf = sum(rt_sme, na.rm=TRUE)/(rt_n-2)/2,
+                                    hgt_cf = sum(hgt_sme, na.rm=TRUE)/(hgt_n-2)/2,
+                                    ca_cf = sum(ca_sme, na.rm=TRUE)/(ca_n-2)/2) %>% 
+  ungroup()
+
+
 obs_predic <- obs_predic %>% mutate(across(c("lf_incpt","hgt_incpt",
                                              "sm_incpt","rot_incpt",
-                                             "ca_incpt","leaf_c","stem_c",
-                                             "root_c","carea","dia_base",
+                                             "ca_incpt","leaf","stem",
+                                             "root","carea","dia_base",
                                              "height","lf_cf","sm_cf","rt_cf",
                                              "hgt_cf","ca_cf"),exp))
 
@@ -355,191 +443,22 @@ obs_predic <- obs_predic %>% mutate(lf_incpt = lf_incpt*lf_cf,
                                     rot_incpt = rot_incpt*rt_cf,
                                     ca_incpt = ca_incpt*ca_cf)
 
-## all in 2-parameter power law
-obs_predic <- obs_predic %>% group_by(spcode) %>% 
-  mutate(lf_pred = lf_incpt*(dia_base^lf_slope),
+## update prediction in un-logged form
+obs_predic <- obs_predic %>% group_by(spcode)                  %>% 
+  mutate(lf_pred = lf_incpt*(dia_base^dbh_lf)*(height^hgt_lf),
          hgt_pred = hgt_incpt*(dia_base^hgt_slope),
-         sm_pred = sm_incpt*(leaf_c^sm_slope),
-         rt_pred = rot_incpt*(leaf_c^rot_slope),
-         ca_pred = ca_incpt*(dia_base^ca_slope))
+         sm_pred = sm_incpt*(dia_base^dbh_sm)*(height^hgt_sm),
+         rt_pred = rot_incpt*(leaf^rot_slope),
+         ca_pred = ca_incpt*(dia_base^dbh_ca)*(height^hgt_ca)) %>% 
+         ungroup()
 
 ## convert carbon to g
 
-obs_predic <- obs_predic %>% mutate(leaf_c = leaf_c*kg_2_g,
-                                    stem_c = stem_c*kg_2_g,
-                                    root_c = root_c*kg_2_g,
+obs_predic <- obs_predic %>% mutate(leaf = leaf*kg_2_g,
+                                    stem = stem*kg_2_g,
+                                    root = root*kg_2_g,
                                     lf_pred = lf_pred*kg_2_g,
                                     sm_pred = sm_pred*kg_2_g,
                                     rot_pred = rot_pred*kg_2_g)
 
-## do a overall plot to compare observation and prediction
 
-## leaf
-ggplot(obs_predic,aes(dia_base,leaf_c)) + geom_point(color="black")+
-  geom_line(aes(dia_base,lf_pred),color="red") +
-  facet_wrap(.~short, ncol=2) +
-  labs(x="Basal diameter(cm)",
-       y="Leaf carbon (g)") + prestheme
-ggsave("../results/model-comp-leaf-sp.jpeg",width = 16, height=14, unit = "cm",
-       dpi=300)
-## height
-ggplot(obs_predic,aes(dia_base,height)) + geom_point(color="black")+
-  geom_line(aes(dia_base,hgt_pred),color="red") +
-  facet_wrap(.~short, ncol=2) +
-  labs(x="Basal diameter(cm)",
-       y="Plant height (m)")+ prestheme
-ggsave("../results/model-comp-hgt-sp.jpeg",width = 16, height=14, unit = "cm",
-       dpi=300)
-
-## stem
-
-ggplot(obs_predic,aes(leaf_c,stem_c)) + geom_point(color="black")+
-  geom_line(aes(leaf_c,sm_pred),color="red") +
-  facet_wrap(.~short, ncol=2) +
-  labs(x="Leaf carbon (g)",
-       y="Stem carbon (g)") + prestheme
-ggsave("../results/model-comp-stem-sp.jpeg",width = 16, height=14, unit = "cm",
-       dpi=300)
-
-#root
-
-ggplot(obs_predic,aes(leaf_c,root_c)) + geom_point(color="black")+
-  geom_line(aes(leaf_c,rot_pred),color="red") +
-  facet_wrap(.~short, ncol=2) +
-  labs(x="Leaf carbon (g)",
-       y="Root carbon (g)") + prestheme
-ggsave("../results/model-comp-root-sp.jpeg",width = 16, height=14, unit = "cm",
-       dpi=300)
-
-## canopy area
-
-ggplot(obs_predic,aes(dia_base,carea)) + geom_point(color="black")+
-  geom_line(aes(dia_base,ca_pred),color="red") +
-  facet_wrap(.~short, ncol=2) +
-  labs(x="Basal daimeter (cm)",
-       y="Canopy area (m2)") + prestheme
-ggsave("../results/model-comp-carea-sp.jpeg",width = 16, height=14, unit = "cm",
-       dpi=300)
-
-## what about an over-all fit?
-
-lf_all <- lm(leaf_c ~ dia_base, data=anuals) #1.8023,0.0002477724
-sm_all <- lm(stem_c ~ leaf_c, data=anuals) #1.17965, 2.846699
-rot_all <- lm(root_c ~ leaf_c, data=anuals) #0.94227, 0.7273264
-hgt_all <- lm(height ~ dia_base, data=anuals) #0.43231, 0.2118197
-ca_all <- lm(carea ~ dia_base, data=anuals) #1.05456, 0.03446055
-
-## model params
-lf_slp <- lf_all$coefficients[2] 
-lf_cpt <- lf_all$coefficients[1]
-sm_slp <- sm_all$coefficients[2]
-sm_cpt <- sm_all$coefficients[1]
-rot_slp <- rot_all$coefficients[2]
-rot_cpt <- rot_all$coefficients[1]
-hgt_slp <- hgt_all$coefficients[2]
-hgt_cpt <- hgt_all$coefficients[1]
-ca_slp <- ca_all$coefficients[2]
-ca_cpt <- ca_all$coefficients[1]
-
-anuals$lf_pred <- predict(lf_all, newdata=anuals)
-anuals$sm_pred <- predict(sm_all, newdata=anuals)
-anuals$rot_pred <- predict(rot_all, newdata=anuals)
-anuals$hgt_pred <- predict(hgt_all, newdata=anuals)
-anuals$ca_pred <- predict(ca_all, newdata=anuals)
-
-anuals <- anuals %>% mutate(lf_n = length(!is.na(leaf_c)),
-                            sm_n = length(!is.na(stem_c)),
-                            rot_n = length(!is.na(root_c)),
-                            hgt_n = length(!is.na(height)),
-                            ca_n = length(!is.na(carea)),
-                            lf_sme = (leaf_c-lf_pred)*(leaf_c-lf_pred),
-                            sm_sme = (stem_c-sm_pred)*(stem_c-sm_pred),
-                            rt_sme = (root_c-rot_pred)*(root_c-rot_pred),
-                            hgt_sme = (height-hgt_pred)*(height-hgt_pred),
-                            ca_sme = (carea-ca_pred)*(carea-ca_pred))
-anuals <- anuals %>% mutate (lf_cf = sum(lf_sme, na.rm=TRUE)/(lf_n-2)/2,
-                            sm_cf = sum(sm_sme,na.rm=TRUE)/(sm_n-2)/2,
-                            rt_cf = sum(rt_sme, na.rm=TRUE)/(rot_n-2)/2,
-                            hgt_cf = sum(hgt_sme, na.rm=TRUE)/(hgt_n-2)/2,
-                            ca_cf = sum(ca_sme, na.rm=TRUE)/(ca_n-2)/2) %>% 
-                            ungroup()
-
-anuals <- anuals %>% mutate(lf_slope = lf_slp,
-                            lf_incpt = lf_cpt,
-                            sm_slope = sm_slp,
-                            sm_incpt = sm_cpt,
-                            rot_slope = rot_slp,
-                            rot_incpt = rot_cpt,
-                            hgt_slope = hgt_slp,
-                            hgt_incpt = hgt_cpt,
-                            ca_slope = ca_slp,
-                            ca_incpt = ca_cpt
-                            )
-
-anuals <- anuals %>% mutate(across(c("lf_incpt","hgt_incpt",
-                                             "sm_incpt","rot_incpt",
-                                             "ca_incpt","leaf_c","stem_c",
-                                             "root_c","carea","dia_base",
-                                             "height","lf_cf","sm_cf","rt_cf",
-                                             "hgt_cf","ca_cf"),exp))
-
-## update intercept
-anuals <- anuals %>% mutate(lf_incpt = lf_incpt*lf_cf,
-                                    hgt_incpt = hgt_incpt*hgt_cf,
-                                    sm_incpt = sm_incpt*sm_cf,
-                                    rot_incpt = rot_incpt*rt_cf,
-                                    ca_incpt = ca_incpt*ca_cf)
-
-
-anuals <- anuals %>% group_by(spcode) %>% 
-  mutate(lf_pred = lf_incpt*(dia_base^lf_slope),
-         hgt_pred = hgt_incpt*(dia_base^hgt_slope),
-         sm_pred = sm_incpt*(leaf_c^sm_slope),
-         rot_pred = rot_incpt*(leaf_c^rot_slope),
-         ca_pred = ca_incpt*(dia_base^ca_slope))
-
-## convert carbon to g
-
-anuals <- anuals %>% mutate(leaf_c = leaf_c*kg_2_g,
-                                    stem_c = stem_c*kg_2_g,
-                                    root_c = root_c*kg_2_g,
-                                    lf_pred = lf_pred*kg_2_g,
-                                    sm_pred = sm_pred*kg_2_g,
-                                    rot_pred = rot_pred*kg_2_g)
-
-#plots
-ggplot(anuals,aes(dia_base,carea)) + geom_point(color="black")+
-  geom_line(aes(dia_base,ca_pred),color="red") +
-  labs(x="Basal daimeter (cm)",
-       y="Canopy area (m2)") + prestheme
-ggsave("../results/model-comp-carea-all.jpeg",width = 12, height=10, unit = "cm",
-       dpi=300)
-
-ggplot(anuals,aes(leaf_c,root_c)) + geom_point(color="black")+
-  geom_line(aes(leaf_c,rot_pred),color="red") +
-  labs(x="Leaf carbon (g)",
-       y="Root carbon (g)") + prestheme
-
-ggsave("../results/model-comp-root-all.jpeg",width = 12, height=10, unit = "cm",
-       dpi=300)
-
-ggplot(anuals,aes(leaf_c,stem_c)) + geom_point(color="black")+
-  geom_line(aes(leaf_c,sm_pred),color="red") +
-  labs(x="Leaf carbon (g)",
-       y="Stem carbon (g)") + prestheme
-ggsave("../results/model-comp-stem-all.jpeg",width = 12, height=10, unit = "cm",
-       dpi=300)
-
-ggplot(anuals,aes(dia_base,leaf_c)) + geom_point(color="black")+
-  geom_line(aes(dia_base,lf_pred),color="red") +
-  labs(x="Basal diameter (cm)",
-       y="Leaf carbon (g)") + prestheme
-ggsave("../results/model-comp-leaf-all.jpeg",width = 12, height=10, unit = "cm",
-       dpi=300)
-
-ggplot(anuals,aes(dia_base,height)) + geom_point(color="black")+
-  geom_line(aes(dia_base,hgt_pred),color="red") +
-  labs(x="Basal diameter (cm)",
-       y="Plant height (m)")+prestheme
-ggsave("../results/model-comp-hgt-all.jpeg",width = 12, height=10, unit = "cm",
-       dpi=300)
