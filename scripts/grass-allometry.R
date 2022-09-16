@@ -186,16 +186,19 @@ plot(rt_poshoc)
 
 ####### 2.Hypothesis testing #######
 
-#### 2a. root allocation is greater in perennial and C4 plants #### 
+#### 2a. root allocation is greater in perennial #### 
 
-#hypo_df      <- all_log %>% filter(!is.na(repro))
+#mature_df      <- all_log %>% filter(!is.na(repro))
 
 frt_hmod    <- lmer(root ~ leaf*growth*photo + (1|spcode)
                  , data = all_log
                  , REML = TRUE)
 
 summary(frt_hmod)
-Anova(frt_hmod) 
+Anova(frt_hmod,type="3",test.statistic = "F") 
+#when testing interaction effect, use this setting for Anova
+
+
 
 
 ## perennial plants have smaller roots and allocate less to below-ground than annual plants at same leaf biomass level
@@ -256,7 +259,7 @@ repro_mod  <- lmer(seed_alloc ~ grate + (1|spcode)
                    ,data=repro_df
                    ,REML=TRUE)
 summary(repro_mod)
-Anova(repro_mod) 
+Anova(repro_mod,type="3",test.statistic = "F") 
 
 
 # reproduction allocation (as %above-ground biomass)
@@ -268,14 +271,14 @@ Anova(repro_mod)
 #zscore <- function(x) (x - mean(x, na.rm=TRUE)) / sd(x, na.rm = TRUE) 
 
 h3df         <- all_log                               %>% 
-                select(spcode,height,sla,lf2sm)        
+                select(spcode,height,carea,sla,lf2sm)        
                 
-lsratio_mod  <- lmer(lf2sm ~ height*sla + (1|spcode)
+lsratio_mod  <- lmer(lf2sm ~ carea*sla + (1|spcode)
                     , data = h3df
                     , REML = TRUE)
 
 summary(lsratio_mod)
-Anova(lsratio_mod)
+Anova(lsratio_mod,type="3",test.statistic = "F")
 
 
 

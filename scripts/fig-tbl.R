@@ -130,11 +130,12 @@ fig2  = ggplot(data=all_log,aes(leaf,root,colour=growth))   +
         pubtheme.nogridlines                                +
         theme(legend.position = "right"
               ,legend.title = element_blank())              +
-        labs(x="Leaf biomass",y="Root biomass") 
+        labs(x="ln(Leaf biomass)",y="ln(Root biomass)") 
 fig2
 
 ggsave(fig2, file = file.path(RESULTS, "fig2.pdf"), width = col1*1.5 , height= 0.85*col1, 
        units="px", dpi = 300) 
+
 
 ####### Fig3. fast-growing plants allocate more to reproduction #######
 
@@ -170,5 +171,23 @@ ggsave(fig4, file = file.path(RESULTS, "fig4.pdf"), width = col1*1.5 , height= 0
        units="px", dpi = 300)       
 
 
+####### S1. root allocation in mature plants only #######
+maturt_fit   = mature_df                                   %>% 
+               select(spcode,short,growth,photo,leaf)      %>% 
+               mutate(root = predict(maturt_mod,newdata=.))
 
+s1           = ggplot(data=mature_df,aes(leaf,root,colour=photo))         +
+               geom_point(shape=16,size=1,alpha=0.6)                      +
+               #facet_wrap(.~growth)                                       +
+               scale_colour_manual(values=schwilkcolors[c(1,3)])          +
+               geom_smooth(data=maturt_fit,method="lm",se=FALSE)          +
+               pubtheme.nogridlines                                       +
+               theme(legend.position = "right"
+                    ,legend.title = element_blank())                      +
+               labs(x="ln(Leaf biomass)"
+                   ,y="ln(Root biomass)") 
+s1               
+
+ggsave(s1, file = file.path(RESULTS, "s1.pdf"), width = col1*1.5 , height= 0.85*col1, 
+       units="px", dpi = 300)    
 
