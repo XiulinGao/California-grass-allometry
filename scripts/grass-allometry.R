@@ -4,6 +4,8 @@
 ## 1. model selection to find the best allometry model for each organ
 ## 2. test some allometry hypotheses 
 
+setwd("~/California-grass-allometry/scripts")
+
 library(tidyverse)
 library(lmtest)
 library(lme4)
@@ -21,10 +23,21 @@ wooden = 0.001
 day2sec = 86400
 
 
-mass <- read.csv("../data/biomass.csv",    stringsAsFactors = FALSE)
-size <- read.csv("../data/plant-size.csv", stringsAsFactors = FALSE)
-sp   <- read.csv("../data/species.csv",    stringsAsFactors = FALSE)
-  
+mass       <- read.csv("../data/biomass.csv"    ,stringsAsFactors = FALSE)
+size       <- read.csv("../data/plant-size.csv" ,stringsAsFactors = FALSE)
+sp         <- read.csv("../data/species.csv"    ,stringsAsFactors = FALSE)
+sla_mass   <- read.csv("../data/SLA-biomass.csv",stringsAsFactors = FALSE)
+sla_area   <- read.csv("../data/leaf-area.csv"  ,stringsAsFactors = FALSE) 
+
+
+sla        <- sla_area                                              %>%  
+              left_join(sla_mass, by=c("spcode","rep"))             %>% 
+              mutate(sla = area/biomass)                            %>% 
+              group_by(spcode)                                      %>% 
+              summarise(sla = mean(sla,na.rm=TRUE))                 %>% 
+              ungroup()                                             %>% 
+              mutate(sla = sla*cm2_2_m2)
+
   
 mass <- mass                                                        %>%  
         mutate(id = paste(spcode, rep, sep="-"))
@@ -52,7 +65,9 @@ size <- size                                        %>%
 
 all <- mass_wide                                            %>% 
        left_join(size, by = c("spcode", "rep","id"))        %>% 
-       left_join(sp,   by =   "spcode")
+       left_join(sla,  by =   "spcode")                     %>% 
+       left_join (sp,  by =   "spcode")                     %>% 
+       filter(spcode!="POSE")
         
 all <- all                                                  %>% 
        mutate(carea      = pi*(dia_can*dia_can/4  )
@@ -76,8 +91,9 @@ all <- all                                                  %>%
              ,lf2rt      = root_c/leaf_c
              ,agb2rt     = root_c/agb_c
              ,seed_alloc = repro_c/agb_c
-             ,lf2sm      = stem_c/leaf_c
-             ,ca2ba      = barea/carea)
+             ,lf2sm      = leaf_c/stem_c
+             ,ca2ba      = barea/carea
+             ,tlarea     = leaf*sla)
 
 
 all_log <- all                                                  %>% 
@@ -86,7 +102,7 @@ all_log <- all                                                  %>%
                            "agb","agb_c","tmass","tmass_c"    ,
                            "dia_base","dia_can","length"      ,
                            "height","barea","carea","lf2sm"   ,
-                           "ca2ba")                           ,
+                           "ca2ba","sla","tlarea")            ,
                            ~log(.x)))
 
 
@@ -172,16 +188,21 @@ plot(rt_poshoc)
 
 #### 2a. root allocation is greater in perennial and C4 plants #### 
 
+#hypo_df      <- all_log %>% filter(!is.na(repro))
 
-frt_hmod <- lmer(root ~ leaf*growth*photo + (1|spcode)
+frt_hmod    <- lmer(root ~ leaf*growth*photo + (1|spcode)
                  , data = all_log
                  , REML = TRUE)
 
 summary(frt_hmod)
-Anova(frt_hmod,method="3",test.statistic = "F") 
+Anova(frt_hmod) 
 
-## perennial plants allocate more to below-ground than annual plants 
-## at the higher end of leaf biomass, might be ontogenetic effect.
+
+## perennial plants have smaller roots and allocate less to below-ground than annual plants at same leaf biomass level
+## C4 plants allocate more to below-ground than C3 plants at same leaf biomass level, but overall there's no difference
+## between C3 and C4 plants regarding root biomass.But these statements only apply to mature plants. 
+## when all data are used (including seedlings and smaller plants), there's ontogenetic effects that we only
+## see higher root allocation at later stage in perennial plants. 
 
 
 
@@ -237,18 +258,24 @@ repro_mod  <- lmer(seed_alloc ~ grate + (1|spcode)
 summary(repro_mod)
 Anova(repro_mod) 
 
-repro_fit  <- repro_df                                           %>% 
-              select(-seed_alloc)                                %>% 
-              mutate(seed_alloc = predict(repro_mod,newdata=.))
+
 # reproduction allocation (as %above-ground biomass)
 # is positively related to growth rate of above-ground biomass
 
 
-######## H3: stem/leaf ratio is influenced by      #######
-####### height (+) and specific leaf area (+)      #######               
+######## H3: leaf/stem ratio is influenced by      #######
+####### height (-) and specific leaf area (-)      #######  
+#zscore <- function(x) (x - mean(x, na.rm=TRUE)) / sd(x, na.rm = TRUE) 
 
+h3df         <- all_log                               %>% 
+                select(spcode,height,sla,lf2sm)        
+                
+lsratio_mod  <- lmer(lf2sm ~ height*sla + (1|spcode)
+                    , data = h3df
+                    , REML = TRUE)
 
-
+summary(lsratio_mod)
+Anova(lsratio_mod)
 
 
 
