@@ -6,6 +6,7 @@
 library(ggplot2)
 library(RColorBrewer)
 library(patchwork)
+library(corrplot)
 #require(wesanderson)
 
 
@@ -120,10 +121,57 @@ fig1
 ggsave(fig1, file = file.path(RESULTS, "fig1.pdf"), width = col2*1.75 , height= col2, 
        units="px", dpi = 350)
 
-####### Fig2. root allocation between annual perennial C3 C4 #######
 
 
-fig2  = ggplot(data=all_log,aes(leaf,root,colour=growth))   +
+####### Fig2. traits correlation matrix #######
+
+cor_df = obs_predic                %>% 
+         select( spcode
+               , hgt_slope
+               , rot_slope
+               , dbh_sm
+               , hgt_sm
+               , dbh_lf
+               , hgt_lf
+               , dbh_ca
+               , hgt_ca
+               , hgt_incpt
+               , rot_incpt
+               , sm_incpt
+               , lf_incpt
+               , ca_incpt)         %>% 
+        distinct()                 %>% 
+        left_join(sla,by="spcode") %>% 
+        select(-spcode)
+
+plot_nams = c( "$ H[dbh-exp]", "$ Frt[lf-exp]", "$ Stem[dbh-exp]"
+             , "$ Stem[hgt-exp]", "$ Leaf[dbh-exp]", "$ Leaf[hgt-exp]"
+             , "$ CanA[dbh-exp]", "$ CanA[hgt-exp]", "$ H[coef]"
+             , "$ Frt[coef]", "$ Stem[coef]","$ Leaf[coef]"
+             , "$ CanA[coef]", "SLA")       
+corrs     = cor(cor_df)
+colnames(corrs) <- plot_nams
+rownames(corrs) <- plot_nams
+f_output  = "fig2.pdf"
+
+pdf(file = file.path(RESULTS,f_output),width = col1*1.5/300 , height= col1*0.85/300)
+par(family=fontfamily)
+fig2 = corrplot(corrs
+        ,method = "color"
+        ,type="lower"
+        ,addCoef.col="grey50"
+        ,mar=c(0,0,1,0)
+        ,order = "original"
+        ,number.cex= 0.25
+        ,tl.cex = 0.6
+        ,tl.col="black"
+        ,cl.cex=0.5)
+dev.off()
+ 
+####### Fig3. root allocation between annual perennial C3 C4 #######
+
+
+fig3  = ggplot(data=all_log,aes(leaf,root,colour=growth))   +
         geom_point(size=1,shape=16,alpha=0.6)               +
         geom_smooth(data=hypo_rootfit,method="lm",se=FALSE) +
         scale_color_manual(values=schwilkcolors[c(1,3)])    +
@@ -131,15 +179,15 @@ fig2  = ggplot(data=all_log,aes(leaf,root,colour=growth))   +
         theme(legend.position = "right"
               ,legend.title = element_blank())              +
         labs(x="ln(Leaf biomass)",y="ln(Root biomass)") 
-fig2
+fig3
 
-ggsave(fig2, file = file.path(RESULTS, "fig2.pdf"), width = col1*1.5 , height= 0.85*col1, 
+ggsave(fig3, file = file.path(RESULTS, "fig3.pdf"), width = col1*1.5 , height= 0.85*col1, 
        units="px", dpi = 300) 
 
 
-####### Fig3. fast-growing plants allocate more to reproduction #######
+####### Fig4. fast-growing plants allocate more to reproduction #######
 
-fig3   = ggplot(data=repro_df,aes(grate,repro_ave))                        +
+fig4   = ggplot(data=repro_df,aes(grate,repro_ave))                        +
          geom_errorbar(aes(ymin = repro_ave-repro_se
                           ,ymax = repro_ave+repro_se))                     +
          geom_point(shape=16,size=1)                                       +
@@ -149,13 +197,13 @@ fig3   = ggplot(data=repro_df,aes(grate,repro_ave))                        +
               ,legend.title = element_blank())                             +
          labs(x="Aboveground biomass growth rate"
              ,y="Reproduction allocation") 
-fig3
+fig4
 
-ggsave(fig3, file = file.path(RESULTS, "fig3.pdf"), width = col1*1.5 , height= 0.85*col1, 
+ggsave(fig4, file = file.path(RESULTS, "fig4.pdf"), width = col1*1.5 , height= 0.85*col1, 
        units="px", dpi = 300) 
 
-####### Fig4. Biomass partition between stem and foliage #######
-fig4   = ggplot(data=all_log,aes(height,lf2sm,colour=slagrp))             +
+####### Fig5. Biomass partition between stem and foliage #######
+fig5   = ggplot(data=all_log,aes(height,lf2sm,colour=slagrp))             +
          geom_point(shape=16,size=1,alpha=0.6)                            +
          scale_color_manual(values=schwilkcolors[c(1,3)]
                            ,labels=parse_format())                        +
@@ -165,9 +213,9 @@ fig4   = ggplot(data=all_log,aes(height,lf2sm,colour=slagrp))             +
               ,legend.title = element_blank())                            +
          labs(x="ln(Plant height)"
              ,y="ln(Leaf to stem ratio)") 
-fig4
+fig5
 
-ggsave(fig4, file = file.path(RESULTS, "fig4.pdf"), width = col1*1.5 , height= 0.85*col1, 
+ggsave(fig5, file = file.path(RESULTS, "fig5.pdf"), width = col1*1.5 , height= 0.85*col1, 
        units="px", dpi = 300)       
 
 
