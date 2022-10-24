@@ -7,9 +7,10 @@ library(ggplot2)
 library(RColorBrewer)
 library(patchwork)
 library(corrplot)
+library(scales)
 #require(wesanderson)
 
-
+setwd("~/California-grass-allometry/scripts")
 source("./ggplot-theme.R")
 source("./grass-allometry.R")
 
@@ -17,38 +18,54 @@ RESULTS     = "../results/"
 
 hgt_labels  =  c("Short","Medium","Tall")
 
-all_log     = all_log                                           %>% 
-              mutate(hgroup = cut( height
-                                   ,breaks = c(-Inf, -1.8, -0.9, Inf)
+all         =   all                                            %>% 
+                mutate(hgroup = cut( height
+                                   ,breaks = c(-Inf, exp(-1.8), exp(-0.9), Inf)
                                    ,labels = hgt_labels)
-                    ,slagrp = cut(sla
-                                 ,breaks   = c(-Inf, -3.91, Inf)
-                                 ,labels   = c("SLA <= 0.02~m^2~g^{-1}", 
+                      ,slagrp = cut(sla
+                                   ,breaks   = c(-Inf, exp(-3.91), Inf)
+                                   ,labels   = c("SLA <= 0.02~m^2~g^{-1}", 
                                                "SLA > 0.02~m^2~g^{-1}")))
+
+all_log     =   all_log                                        %>% 
+                mutate(hgroup = cut( height
+                      ,breaks = c(-Inf, -1.8, -0.9, Inf)
+                      ,labels = hgt_labels)
+         ,slagrp = cut(sla
+                      ,breaks   = c(-Inf, -3.91, Inf)
+                      ,labels   = c("SLA <= 0.02~m^2~g^{-1}", 
+                                    "SLA > 0.02~m^2~g^{-1}")))
 
 allom_fit1     = all_log                                        %>% 
                  select(spcode,short,dia_base,height,hgroup)    %>% 
                  mutate(carea = predict(ca_allom,newdata=.)
                        ,leaf  = predict(lf_allom,newdata=.)
-                       ,stem  = predict(sm_allom,newdata=.))
+                       ,stem  = predict(sm_allom,newdata=.))    %>% 
+                 mutate(across(c("dia_base","height","carea"
+                                ,"leaf","stem"),exp))       
 allom_fit2     = all_log                                        %>% 
                  select(spcode,short,dia_base,leaf)             %>% 
                  mutate(height = predict(hgt_allom,newdata=.)
-                       ,root   = predict(rt_allom,newdata=.))
+                       ,root   = predict(rt_allom,newdata=.))   %>% 
+                 mutate(across(c("dia_base","leaf","height",
+                                 "root"),exp))
                  
 
 hypo_rootfit   = all_log                                        %>% 
                  select(spcode,short,growth,photo,
                        leaf)                                    %>%
-                 mutate(root = predict(frt_hmod,newdata=.))
+                 mutate(root = predict(frt_hmod,newdata=.))     %>% 
+                 mutate(across(c("leaf","root"),exp))
 
 repro_fit     = repro_df                                          %>% 
                 select(-seed_alloc)                               %>% 
-                mutate(seed_alloc = predict(repro_mod,newdata=.))
+                mutate(seed_alloc = predict(repro_mod,newdata=.)) 
          
 lfsm_fit      = all_log                                           %>% 
                 select(spcode,short,sla,height,carea,slagrp)      %>% 
-                mutate(lf2sm = predict(lsratio_mod,newdata=.))
+                mutate(lf2sm = predict(lsratio_mod,newdata=.))    %>% 
+                mutate(across(c("sla","height","carea",
+                                "lf2sm"),exp))
 
 
 ###### Fig1. allometric relationships showing species effects ######
@@ -58,50 +75,84 @@ design = "
 456
 " 
 
-fig1a = ggplot(data = all_log, aes(dia_base,carea,colour=short))  +
-        geom_point(aes(shape=hgroup),alpha=0.5)                   +
-        geom_smooth(data=allom_fit1,method="lm",se=FALSE)         +
-        scale_color_brewer(palette="Paired")                      +
-        pubtheme.nogridlines                                      +
-        theme(legend.position = "none")                           +
-        labs(x="",y="ln(Canopy area)")
-
         
-fig1b = ggplot(data = all_log, aes(dia_base,leaf,colour=short))    +
+fig1a = ggplot(data = all, aes(dia_base,leaf,colour=short))        +
         geom_point(aes(shape=hgroup),alpha=0.5)                    +
         geom_smooth(data=allom_fit1,method="lm",se=FALSE)          +
         scale_color_brewer(palette="Paired")                       +
+        scale_x_continuous(trans="log2"
+                          ,breaks=breaks_log(n=6)
+                          ,labels=number_format(accuracy=0.1))     +
+        scale_y_continuous(trans="log2"
+                          ,breaks=breaks_log(n=6)
+                          ,labels=label_scientific(digits=1))      +
         pubtheme.nogridlines                                       +
         theme(legend.position = "none")                            +
-        labs(x="",y="ln(Leaf biomass)")
+        labs(x="",y="Leaf biomass (kg)")
 
 
-fig1c = ggplot(data = all_log, aes(dia_base,stem,colour=short))   +
+fig1b = ggplot(data = all, aes(dia_base,stem,colour=short))       +
         geom_point(aes(shape=hgroup),alpha=0.5)                   +
         geom_smooth(data=allom_fit1,method="lm",se=FALSE)         +
         scale_color_brewer(palette="Paired")                      +
+        scale_x_continuous(trans="log2"
+                          ,breaks=breaks_log(n=6)
+                          ,labels=number_format(accuracy=0.1))    +
+        scale_y_continuous(trans="log2"
+                          ,breaks=breaks_log(n=6)
+                          ,labels=label_scientific(digits=1))     +
         pubtheme.nogridlines                                      +
         theme(legend.position = "bottom")                         +
-        labs(x="ln(Basal diameter)",y="ln(Stem biomass)")         +
+        labs(x="",y="Stem biomass (kg)")         +
         guides(colour = guide_legend( ncol=2
               ,label.theme = element_text(face="italic")),
                shape  = guide_legend("Height group"))
 
-fig1d =  ggplot(data = all_log, aes(dia_base,height,colour=short))  +
+fig1c = ggplot(data = all, aes(leaf,root,colour=short))      +
+  geom_point(alpha = 0.5,shape=16)                           +
+  geom_smooth(data=allom_fit2,method="lm",se=FALSE)          +
+  scale_color_brewer(palette="Paired")                       +
+  scale_x_continuous(trans="log2"
+                     ,breaks=breaks_log(n=6)
+                     ,labels=label_scientific(digits=1))     +
+  scale_y_continuous(trans="log2"
+                     ,breaks=breaks_log(n=6)
+                     ,labels=label_scientific(digits=1))     +
+  pubtheme.nogridlines                                       +
+  theme(legend.position = "none")                            +
+  labs(x="Leaf Biomass (kg)",y="Root biomass (kg)")
+
+
+fig1d = ggplot(data = all, aes(dia_base,carea,colour=short))+
+  geom_point(aes(shape=hgroup),alpha=0.5)                   +
+  geom_smooth(data=allom_fit1,method="lm",se=FALSE)         +
+  scale_color_brewer(palette="Paired")                      +
+  scale_x_continuous(trans="log2"
+                     ,breaks=breaks_log(n=6)
+                     ,labels=number_format(accuracy=0.1))   +
+  scale_y_continuous(trans="log2"
+                     ,breaks=breaks_log(n=6)
+                     ,labels=label_scientific(digits=1))    +
+  pubtheme.nogridlines                                      +
+  theme(legend.position = "none")                           +
+  labs(x="Basal diameter (cm)",y=expression("Canopy area"~"("*m^2*")"))
+
+
+
+fig1e =  ggplot(data = all, aes(dia_base,height,colour=short))      +
          geom_point(alpha = 0.5,shape=16)                           +
          geom_smooth(data=allom_fit2,method="lm",se=FALSE)          +
          scale_color_brewer(palette="Paired")                       +
+         scale_x_continuous(trans="log2"
+                           ,breaks=breaks_log(n=6)
+                           ,labels=number_format(accuracy=0.1))     +
+         scale_y_continuous(trans="log2"
+                           ,breaks=breaks_log(n=5)
+                           ,labels=number_format(accuracy=0.1))     +
          pubtheme.nogridlines                                       +
          theme(legend.position = "none")                            +
-         labs(x="ln(Basal diameter)",y="ln(Plant height)")
+         labs(x="Basal diameter (cm)",y="Plant height (m)")
 
-fig1e = ggplot(data = all_log, aes(dia_base,root,colour=short))    +
-        geom_point(alpha = 0.5,shape=16)                           +
-        geom_smooth(data=allom_fit2,method="lm",se=FALSE)          +
-        scale_color_brewer(palette="Paired")                       +
-        pubtheme.nogridlines                                       +
-        theme(legend.position = "none")                            +
-        labs(x="ln(Basal diameter)",y="ln(Root biomass)")
 
 
 
@@ -118,7 +169,7 @@ fig1 = fig1a + fig1b + fig1c + fig1d + fig1e                      +
              legend.title = element_blank())
 fig1
 
-ggsave(fig1, file = file.path(RESULTS, "fig1.pdf"), width = col2*1.75 , height= col2, 
+ggsave(fig1, file = file.path(RESULTS, "fig1_unlog.pdf"), width = col2*1.8 , height= col2, 
        units="px", dpi = 350)
 
 
@@ -150,35 +201,55 @@ plot_nams = c( "$ H[dbh-exp]", "$ Frt[lf-exp]", "$ Stem[dbh-exp]"
              , "$ Frt[coef]", "$ Stem[coef]","$ Leaf[coef]"
              , "$ CanA[coef]", "SLA")       
 corrs     = cor(cor_df)
+sigtest   = cor.mtest(cor_df, conf.level=0.95, method="spearman")
+sig_p     = sigtest$p
 colnames(corrs) <- plot_nams
 rownames(corrs) <- plot_nams
+colnames(sig_p) <- plot_nams
+rownames(sig_p) <- plot_nams
+
+
 f_output  = "fig2.pdf"
 
 pdf(file = file.path(RESULTS,f_output),width = col1*1.5/300 , height= col1*0.85/300)
 par(family=fontfamily)
 fig2 = corrplot(corrs
-        ,method = "color"
-        ,type="lower"
-        ,addCoef.col="grey50"
-        ,mar=c(0,0,1,0)
-        ,order = "original"
-        ,number.cex= 0.25
-        ,tl.cex = 0.6
-        ,tl.col="black"
-        ,cl.cex=0.5)
+        ,p.mat       = sig_p
+        ,sig.level   = 0.05
+        ,insig       = "label_sig"
+        ,pch.cex     = 0.5
+        ,method      = "ellipse"
+        ,type        = "lower"
+        ,diag        =FALSE
+        #,addCoef.col = "grey50"
+        ,mar         = c(0,0,1,0)
+        ,order       = "original"
+        #,number.cex  = 0.25
+        ,tl.cex      = 0.6
+        ,tl.col      = "black"
+        ,cl.cex      = 0.5)
 dev.off()
  
 ####### Fig3. root allocation between annual perennial C3 C4 #######
 
 
-fig3  = ggplot(data=all_log,aes(leaf,root,colour=growth))   +
+fig3  = ggplot(data=all,aes(leaf,root,colour=growth))       +
         geom_point(size=1,shape=16,alpha=0.6)               +
         geom_smooth(data=hypo_rootfit,method="lm",se=FALSE) +
-        scale_color_manual(values=schwilkcolors[c(1,3)])    +
+        geom_abline(slope = 1, intercept=0,color="black",
+                    linetype = "dashed",size=0.8)           +
+  
+        scale_color_manual(values=schwilkcolors[c(1,4)])    +
+        scale_x_continuous(trans="log2"
+                          ,breaks=breaks_log(n=6)
+                          ,labels=label_scientific(digits=1)) +
+        scale_y_continuous(trans="log2"
+                          ,breaks=breaks_log(n=6)
+                          ,labels=label_scientific(digits=1)) +
         pubtheme.nogridlines                                +
         theme(legend.position = "right"
               ,legend.title = element_blank())              +
-        labs(x="ln(Leaf biomass)",y="ln(Root biomass)") 
+        labs(x="Leaf biomass (kg)",y="Root biomass (kg)") 
 fig3
 
 ggsave(fig3, file = file.path(RESULTS, "fig3.pdf"), width = col1*1.5 , height= 0.85*col1, 
@@ -187,55 +258,65 @@ ggsave(fig3, file = file.path(RESULTS, "fig3.pdf"), width = col1*1.5 , height= 0
 
 ####### Fig4. fast-growing plants allocate more to reproduction #######
 
-fig4   = ggplot(data=repro_df,aes(grate,repro_ave))                        +
+fig4   = ggplot(data=repro_df,aes(grate,repro_ave, color=short))           +
          geom_errorbar(aes(ymin = repro_ave-repro_se
                           ,ymax = repro_ave+repro_se))                     +
          geom_point(shape=16,size=1)                                       +
          geom_smooth(data=repro_fit,method="lm",se=FALSE,color="black")    +
+         scale_color_brewer(palette="Paired")                              +
          pubtheme.nogridlines                                              +
          theme(legend.position = "right"
               ,legend.title = element_blank())                             +
          labs(x="Aboveground biomass growth rate"
-             ,y="Reproduction allocation") 
+             ,y="Reproduction allocation")                                 +
+         guides(colour = guide_legend( ncol=1
+                                ,label.theme = element_text(face="italic")))
 fig4
 
 ggsave(fig4, file = file.path(RESULTS, "fig4.pdf"), width = col1*1.5 , height= 0.85*col1, 
        units="px", dpi = 300) 
 
 ####### Fig5. Biomass partition between stem and foliage #######
-fig5   = ggplot(data=all_log,aes(height,lf2sm,colour=slagrp))             +
+fig5   = ggplot(data=all,aes(height,lf2sm,colour=slagrp))                 +
          geom_point(shape=16,size=1,alpha=0.6)                            +
-         scale_color_manual(values=schwilkcolors[c(1,3)]
+         scale_color_manual(values=schwilkcolors[c(1,4)]
                            ,labels=parse_format())                        +
          geom_smooth(data=lfsm_fit,method="lm",se=FALSE)                  +
+         scale_x_continuous(trans="log2"
+                           ,breaks=breaks_log(n=5)
+                           ,labels=number_format(accuracy=0.1))           +
+         scale_y_continuous(trans="log2"
+                           ,breaks=breaks_log(n=6)
+                           ,labels=number_format(accuracy=0.1))           +
+
          pubtheme.nogridlines                                             +
          theme(legend.position = "right"
               ,legend.title = element_blank())                            +
-         labs(x="ln(Plant height)"
-             ,y="ln(Leaf to stem ratio)") 
+         labs(x="Plant height (m)"
+             ,y="Leaf to stem ratio") 
 fig5
 
 ggsave(fig5, file = file.path(RESULTS, "fig5.pdf"), width = col1*1.5 , height= 0.85*col1, 
        units="px", dpi = 300)       
 
 
-####### S1. root allocation in mature plants only #######
-maturt_fit   = mature_df                                   %>% 
-               select(spcode,short,growth,photo,leaf)      %>% 
-               mutate(root = predict(maturt_mod,newdata=.))
 
-s1           = ggplot(data=mature_df,aes(leaf,root,colour=photo))         +
-               geom_point(shape=16,size=1,alpha=0.6)                      +
-               #facet_wrap(.~growth)                                       +
-               scale_colour_manual(values=schwilkcolors[c(1,3)])          +
-               geom_smooth(data=maturt_fit,method="lm",se=FALSE)          +
-               pubtheme.nogridlines                                       +
-               theme(legend.position = "right"
-                    ,legend.title = element_blank())                      +
-               labs(x="ln(Leaf biomass)"
-                   ,y="ln(Root biomass)") 
-s1               
 
-ggsave(s1, file = file.path(RESULTS, "s1.pdf"), width = col1*1.5 , height= 0.85*col1, 
-       units="px", dpi = 300)    
+## making tree-grass comparision figures
 
+tree = data.frame(rep=c(1:14),
+                  dia_base=c(64,25,14,18,24,12,18,19,42,12,19,13,22,17),
+                  leaf=c(3.75,9.75,2.21,5.23,6.79,1.95,4.42,5.38,29.30,1.83,5.23,2.20,9.04,5.93),
+                  height=c(7.4,6.7,4.7,7.8,7.5,5.9,7.2,6.7,9.9,4.2,6.8,6.3,7.5,4.4),
+                  short="Blue oak")
+grass = all %>% filter(spcode %in% c("AVBA","BRDI2")) %>% select(short,rep,dia_base,height,leaf)
+com   = rbind(tree,grass)
+s2 <- ggplot(com,aes(dia_base,leaf,color=short)) + geom_point()+
+  scale_color_manual(values=schwilkcolors[1:3]) +
+  scale_x_log10() +
+  scale_y_log10() +
+  geom_smooth(method="lm",se=FALSE)+
+  labs(x="Diameter (cm)",y="Leaf dry mass (kg)") +
+  guides(color=guide_legend(title=""))
+ggsave(s2, file = file.path(RESULTS, "s2.pdf"), width = col1*1.5 , height= 0.85*col1, 
+       units="px", dpi = 300)  
