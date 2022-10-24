@@ -186,26 +186,20 @@ plot(rt_poshoc)
 
 ####### 2.Hypothesis testing #######
 
-#### 2a. root allocation is greater in perennial #### 
+#### 2a. root allocation is greater in perennial, especially C4 perennials #### 
 
 #mature_df      <- all_log %>% filter(!is.na(repro))
 
-frt_hmod    <- lmer(root ~ leaf*growth*photo + (1|spcode)
+frt_hmod    <- lmer(root ~ leaf*growth*photo - photo + (1|spcode)
                  , data = all_log
                  , REML = TRUE)
 
 summary(frt_hmod)
 Anova(frt_hmod,type="3",test.statistic = "F") 
+
 #when testing interaction effect, use this setting for Anova
 
 
-
-
-## perennial plants have smaller roots and allocate less to below-ground than annual plants at same leaf biomass level
-## C4 plants allocate more to below-ground than C3 plants at same leaf biomass level, but overall there's no difference
-## between C3 and C4 plants regarding root biomass.But these statements only apply to mature plants. 
-## when all data are used (including seedlings and smaller plants), there's ontogenetic effects that we only
-## see higher root allocation at later stage in perennial plants. 
 
 
 
@@ -259,8 +253,8 @@ repro_mod  <- lmer(seed_alloc ~ grate + (1|spcode)
                    ,data=repro_df
                    ,REML=TRUE)
 summary(repro_mod)
-Anova(repro_mod,type="3",test.statistic = "F") 
-
+Anova(repro_mod,type="2",test.statistic = "F") 
+#when no interaction effect is test, use type 2
 
 # reproduction allocation (as %above-ground biomass)
 # is positively related to growth rate of above-ground biomass
@@ -491,4 +485,22 @@ obs_predic <- obs_predic %>% mutate(leaf = leaf*kg_2_g,
                                     sm_pred = sm_pred*kg_2_g,
                                     rot_pred = rot_pred*kg_2_g)
 
-
+allom_params = obs_predic             %>% 
+               select(spcode
+                     ,short
+                     ,photo
+                     ,growth
+                     ,hgt_slope
+                     ,rot_slope
+                     ,hgt_incpt
+                     ,rot_incpt
+                     ,sm_incpt
+                     ,lf_incpt
+                     ,ca_incpt
+                     ,dbh_sm
+                     ,hgt_sm
+                     ,dbh_lf
+                     ,hgt_lf
+                     ,dbh_ca
+                     ,hgt_ca)        %>% 
+  distinct()
