@@ -1,14 +1,14 @@
 species,spcode,short,photo,growth
-Avena barbata,AVBA,A.barbata,C3,annual
-Bromus hordeaceus,BRHO2,B.hordeaceus,C3,annual
-Brachypodium distachyon,BRDI2,B.distachyon,C3,annual
-Vulpia myuros,VUMY,V.myuros,C3,annual
-Elymus glaucus,ELGL,E.glaucus,C3,perennial
-Festuca californica,FECA,F.californica,C3,perennial
-Nassella pulchra,NAPU4,N.pulchra,C3,perennial
-Aristida oligantha,AROL,A.oligantha,C4,annual
-Setaria pumila,SEPU8,S.pumila,C4,annual
-Sporobolus airoides,SPAI,S.airoides,C4,perennial
-Aristida purpurea,ARPU9,A.purpurea,C4,perennial
-Muhlenbergia rigens,MURI2,M.rigens,C4,perennial
-Poa secunda,POSE,P.secunda,C3,perennial
+Avena barbata,AVBA,A.barbata,C3,Annual
+Bromus hordeaceus,BRHO2,B.hordeaceus,C3,Annual
+Brachypodium distachyon,BRDI2,B.distachyon,C3,Annual
+Vulpia myuros,VUMY,V.myuros,C3,Annual
+Elymus glaucus,ELGL,E.glaucus,C3,Perennial
+Festuca californica,FECA,F.californica,C3,Perennial
+Nassella pulchra,NAPU4,N.pulchra,C3,Perennial
+Aristida oligantha,AROL,A.oligantha,C4,Annual
+Setaria pumila,SEPU8,S.pumila,C4,Annual
+Sporobolus airoides,SPAI,S.airoides,C4,Perennial
+Aristida purpurea,ARPU9,A.purpurea,C4,Perennial
+Muhlenbergia rigens,MURI2,M.rigens,C4,Perennial
+Poa secunda,POSE,P.secunda,C3,Perennial
