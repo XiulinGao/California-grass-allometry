@@ -13,14 +13,14 @@ schwilkcolors <- c("#A0AE6A", "#836B43", "#D68D18", "#437683", "#18B0D6")
 
 ## The ggplot theme for all figures.
 bestfit <- geom_smooth(method="lm",se = F, color = "black", size=1.5)
-textsize <- 14
-smsize <- textsize-2
+textsize <- 10
+smsize <- textsize-3
 pt2mm <- 0.35146
 smsize.mm <- smsize*pt2mm
 fontfamily = "ArialMT"
 #fontfamily = "Arial"
-col2 <- 1961  # px
-col1 <- 945 # px #according to https://www.oikosjournal.org/authors/author-guidelines
+col2 <- 18  # cm
+col1 <- 8.5 # cm #according to https://www.esa.org/wp-content/uploads/2022/05/ESA-Manuscript-Preparation-Guide.pdf
 pubtheme   <-  theme_grey() +
              theme(axis.title.y = element_text(family=fontfamily,
                    size = textsize, angle = 90, vjust=0.3),
