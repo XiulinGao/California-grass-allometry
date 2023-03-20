@@ -67,7 +67,7 @@ all <- mass_wide                                            %>%
        left_join(size, by = c("spcode", "rep","id"))        %>% 
        left_join(sla,  by =   "spcode")                     %>% 
        left_join (sp,  by =   "spcode")                     %>% 
-       filter(spcode!="POSE")
+       filter(!spcode %in% c("POSE","FECA"))
         
 all <- all                                                  %>% 
        mutate(carea      = pi*(dia_can*dia_can/4  )
@@ -91,7 +91,9 @@ all <- all                                                  %>%
              ,lf2rt      = root_c/leaf_c
              ,agb2rt     = root_c/agb_c
              ,seed_alloc = repro_c/agb_c
+             ,seed_alloct= repro_c/tmass_c
              ,lf2sm      = leaf_c/stem_c
+             ,rt2lf      = root_c/leaf_c
              ,ca2ba      = barea/carea
              ,tlarea     = leaf*sla)
 
@@ -102,48 +104,62 @@ all_log <- all                                                  %>%
                            "agb","agb_c","tmass","tmass_c"    ,
                            "dia_base","dia_can","length"      ,
                            "height","barea","carea","lf2sm"   ,
-                           "ca2ba","sla","tlarea")            ,
-                           ~log(.x)))
+                           "rt2lf","agb2rt","ca2ba","sla"     ,
+                           "tlarea") , ~log(.x)))
 
 
 ####### 1. Allometry model selection and species-specific variation #######
 
 #### 1a.height allometry model ####
 
-hgt_null  <- lm(height ~ dia_base, all_log)
-hgt_full  <- lm(height ~ dia_base*spcode,all_log)
-AIC(hgt_null,hgt_full)
-hgt_poshoc  <- emmeans(hgt_full, pairwise ~ dia_base*spcode)
+hgt_null   <- lm(height ~ dia_base, all_log)
+hgt_full1  <- lm(height ~ dia_base*spcode,all_log)
+hgt_full2  <- lm(height ~ dia_base*(photo+growth),all_log)
+
+AIC(hgt_null,hgt_full1, hgt_full2)
+hgt_poshoc  <- emmeans(hgt_full1, pairwise ~ dia_base*spcode)
 
 
-hgt_allom <- hgt_full
+hgt_allom <- hgt_full1
 summary(hgt_allom)
 anova(hgt_allom)
+anova(hgt_full2)
 
 #### 1b.canopy area allometry ####
 
-ca_null1  <- lm(carea ~ dia_base + height, all_log)
-ca_null2  <- lm(carea ~ dia_base, all_log)
-ca_null3  <- lm(carea ~ height, all_log)
-ca_full1  <- lm(carea ~ (dia_base + height)*spcode, all_log)
-ca_full2  <- lm(carea ~ dia_base*spcode, all_log)
-ca_full3  <- lm(carea ~ height*spcode, all_log)
-AIC(ca_null1,ca_null2,ca_null3,ca_full1,ca_full2,ca_full3)
-ca_poshoc <- emmeans(ca_full1, pairwise ~ dia_base:height:spcode)
+#ca_null1  <- lm(carea ~ dia_base*height,all_log)
+ca_null2  <- lm(carea ~ dia_base + height, all_log)
+ca_null3  <- lm(carea ~ dia_base, all_log)
+ca_null4  <- lm(carea ~ height, all_log)
+#ca_full1  <- lm(carea ~ dia_base*height*spcode,all_log)
+ca_full2  <- lm(carea ~ (dia_base + height)*spcode, all_log)
+ca_full3  <- lm(carea ~ dia_base*spcode, all_log)
+ca_full4  <- lm(carea ~ height*spcode, all_log)
+ca_full5  <- lm(carea ~ (dia_base + height)*(photo + growth),all_log)
+ca_full6  <- lm(carea ~ dia_base*(photo + growth),all_log)
+ca_full7  <- lm(carea ~ height*(photo + growth),all_log)
+AIC(ca_null2,ca_null3,ca_null4,ca_full2,ca_full3,ca_full4,ca_full5,ca_full6,ca_full7)
+ca_poshoc <- emmeans(ca_full2, pairwise ~ dia_base:height:spcode)
 ca_poshoc
 
-ca_allom <- ca_full1
+ca_allom <- ca_full2
 summary(ca_allom)
 anova(ca_allom)
+anova(ca_full5)
 
 ####1c. leaf allometry ####
-lf_null1  <- lm(leaf ~ dia_base, all_log)
+#lf_null1  <- lm(leaf ~ dia_base*height, all_log)
 lf_null2  <- lm(leaf ~ dia_base + height, all_log)
-lf_null3  <- lm(leaf ~ height, all_log)
-lf_full1  <- lm(leaf ~ dia_base*spcode, all_log)
+lf_null3  <- lm(leaf ~ dia_base, all_log)
+lf_null4  <- lm(leaf ~ height, all_log)
+#lf_full1  <- lm(leaf ~ dia_base*height*spcode, all_log)
 lf_full2  <- lm(leaf ~ (dia_base + height)*spcode,all_log)
-lf_full3  <- lm(leaf ~ height*spcode, all_log)
-AIC(lf_null1,lf_null2,lf_null3,lf_full1,lf_full2,lf_full3)
+lf_full3  <- lm(leaf ~ dia_base*spcode, all_log)
+lf_full4  <- lm(leaf ~ height*spcode, all_log)
+lf_full5  <- lm(leaf ~ (dia_base + height)*(growth + photo),all_log)
+lf_full6  <- lm(leaf ~ dia_base*(photo + growth),all_log)
+lf_full7  <- lm(leaf ~ height*(photo + growth),all_log)
+AIC(lf_null2,lf_null3,lf_null4,lf_full2,lf_full3,lf_full4,lf_full5,lf_full6,lf_full7)
 
 lf_allom  <- lf_full2
 anova(lf_allom)
@@ -151,15 +167,21 @@ summary(lf_allom)
 lf_poshoc <- emmeans(lf_allom, pairwise ~ dia_base:height:spcode)
 lf_poshoc
 plot(lf_poshoc)
+anova(lf_full5)
 
 #### 1d.stem allometry ####
 sm_null1 <- lm(stem ~ dia_base, all_log)
 sm_null2 <- lm(stem ~ height, all_log)
 sm_null3 <- lm(stem ~ dia_base + height, all_log)
+#sm_null4 <- lm(stem ~ dia_base*height,all_log)
 sm_full1 <- lm(stem ~ dia_base*spcode, all_log)
 sm_full2 <- lm(stem ~ height*spcode, all_log)
 sm_full3 <- lm(stem ~ (dia_base + height)*spcode, all_log)
-AIC(sm_null1,sm_null2,sm_null3,sm_full1,sm_full2,sm_full3)
+#sm_full4 <- lm(stem ~ dia_base*height*spcode,all_log)
+sm_full5 <- lm(stem ~ (dia_base + height)*(photo+growth),all_log)
+sm_full6 <- lm(stem ~ dia_base*(photo + growth),all_log)
+sm_full7 <- lm(stem ~ height*(photo + growth),all_log)
+AIC(sm_null1,sm_null2,sm_null3,sm_full1,sm_full2,sm_full3,sm_full5,sm_full6,sm_full7)
 
 sm_allom <- sm_full3
 summary(sm_allom)
@@ -167,15 +189,21 @@ anova(sm_allom)
 sm_poshoc <- emmeans(sm_allom,pairwise ~ dia_base:height:spcode)
 sm_poshoc
 plot(sm_poshoc)
+anova(sm_full5)
 
 #### 1e. root allometry ####
 rt_null1 <- lm(root ~ leaf,all_log)
-rt_null2 <- lm(root ~ agb, all_log)
+#rt_null2 <- lm(root ~ agb, all_log)
 rt_null3 <- lm(root ~ dia_base, all_log)
+rt_null4 <- lm(root ~ height, all_log)
+rt_null5 <- lm(root ~ dia_base + height, all_log)
 rt_full1 <- lm(root ~ leaf*spcode,all_log)
-rt_full2 <- lm(root ~ agb*spcode,all_log)
+#rt_full2 <- lm(root ~ agb*spcode,all_log)
 rt_full3 <- lm(root ~ dia_base*spcode,all_log)
-AIC(rt_null1,rt_null2,rt_null3,rt_full1,rt_full2,rt_full3)
+rt_full4 <- lm(root ~ height*spcode, all_log)
+rt_full5 <- lm(root ~ (dia_base+height)*spcode,all_log)
+rt_full6 <- lm(root ~ leaf*(photo + growth),all_log)
+AIC(rt_null1,rt_null3,rt_null4,rt_null5,rt_full1,rt_full3,rt_full4,rt_full5,rt_full6)
 
 rt_allom <- rt_full1
 summary(rt_allom)
@@ -183,6 +211,7 @@ anova(rt_allom)
 rt_poshoc <- emmeans(rt_allom,pairwise ~ leaf:spcode)
 rt_poshoc
 plot(rt_poshoc)
+anova(rt_full6)
 
 ####### 2.Hypothesis testing #######
 
@@ -190,12 +219,12 @@ plot(rt_poshoc)
 
 #mature_df      <- all_log %>% filter(!is.na(repro))
 
-frt_hmod    <- lmer(root ~ leaf*growth*photo - photo + (1|spcode)
-                 , data = all_log
-                 , REML = TRUE)
+frt_hmod    <- lmer(rt2lf ~ growth + photo + (1|spcode)
+                   , data = all_log
+                   , REML = TRUE)
 
 summary(frt_hmod)
-Anova(frt_hmod,type="3",test.statistic = "F") 
+Anova(frt_hmod,type="2",test.statistic = "F") 
 
 #when testing interaction effect, use this setting for Anova
 
@@ -208,7 +237,7 @@ Anova(frt_hmod,type="3",test.statistic = "F")
 ## growth rate
 
 growth <- function(df){
-  lm(agb ~ lagday, data=df) 
+  lm(tmass ~ lagday, data=df) 
 }
 
 grow_df   <- all_log                                                %>% 
@@ -239,7 +268,7 @@ grow_coef <- grow_df                          %>%
              rename(grate = mod_tidy_estimate)
 
 repro_df   <- all                                                    %>% 
-              filter(!is.na(seed_alloc))                             %>%
+              filter(!is.na(seed_alloct))                            %>%
               left_join(grow_coef,by="spcode")                       %>%
               group_by(spcode)                                       %>% 
               mutate(repro_sd  = sd(seed_alloc)
@@ -249,7 +278,7 @@ repro_df   <- all                                                    %>%
 
                 
 
-repro_mod  <- lmer(seed_alloc ~ grate + (1|spcode)
+repro_mod  <- lmer(seed_alloct ~ grate + (1|spcode)
                    ,data=repro_df
                    ,REML=TRUE)
 summary(repro_mod)
@@ -264,10 +293,10 @@ Anova(repro_mod,type="2",test.statistic = "F")
 ####### height (-) and specific leaf area (-)      #######  
 #zscore <- function(x) (x - mean(x, na.rm=TRUE)) / sd(x, na.rm = TRUE) 
 
-h3df         <- all_log                               %>% 
-                select(spcode,height,carea,sla,lf2sm)        
+h3df         <- all_log                                    %>% 
+                select(spcode,height,carea,sla,lf2sm)     
                 
-lsratio_mod  <- lmer(lf2sm ~ carea*sla + (1|spcode)
+lsratio_mod  <- lmer(lf2sm ~ height*sla + (1|spcode)
                     , data = h3df
                     , REML = TRUE)
 
@@ -504,3 +533,398 @@ allom_params = obs_predic             %>%
                      ,dbh_ca
                      ,hgt_ca)        %>% 
   distinct()
+
+
+## fit allometric equations for function types
+
+pf_df <- all_log %>% group_by(growth,photo) %>% nest()
+pf_df <- pf_df %>% mutate(  lf_mod = map(data, allom_lf),
+                            hgt_mod = map(data,allom_hgt),
+                            sm_mod = map(data,allom_stem),
+                            rot_mod = map(data,allom_rot),
+                            ca_mod = map(data,allom_ca),
+                            lf_pred = map2(.x=lf_mod, .y=data,~predict(object=.x,newdata=.y)),
+                            hgt_pred = map2(.x=hgt_mod, .y=data,~predict(object=.x,newdata=.y)),
+                            sm_pred = map2(.x=sm_mod, .y=data,~predict(object=.x,newdata=.y)),
+                            rot_pred = map2(.x=rot_mod, .y=data,~predict(object=.x,newdata=.y)),
+                            ca_pred = map2(.x=ca_mod, .y=data,~predict(object=.x,newdata=.y))) 
+
+##glance for model statistic
+pf_df <- pf_df %>% mutate(  lf = map(lf_mod,broom::glance),
+                            hgt = map(hgt_mod,broom::glance),
+                            sm = map(sm_mod, broom::glance),
+                            rot = map(rot_mod, broom::glance),
+                            ca = map(ca_mod,broom::glance)) %>% 
+  unnest(c(lf,hgt,sm,rot,ca),
+         names_sep=".")
+
+pf_df <- pf_df %>% mutate(  lf_tidy = map(lf_mod, broom::tidy),
+                            hgt_tidy = map(hgt_mod, broom::tidy),
+                            sm_tidy = map(sm_mod, broom::tidy),
+                            rot_tidy = map(rot_mod, broom::tidy),
+                            ca_tidy = map(ca_mod, broom::tidy))
+
+## flat model parameter tables
+rthgt_pfparams <- pf_df %>% dplyr::select(growth,photo,data,hgt_tidy,
+                                         rot_tidy,hgt_pred,rot_pred)          %>% 
+  unnest(c(hgt_tidy,rot_tidy),names_sep=".", keep_empty=TRUE)
+
+lsc_pfparams <- pf_df %>% dplyr::select(growth, photo, data, sm_tidy,lf_tidy,
+                                       ca_tidy,sm_pred,lf_pred,ca_pred)     %>% 
+  unnest(c(sm_tidy,lf_tidy,ca_tidy),names_sep=".")
+
+
+rthgt_pfdf <- rthgt_pfparams                            %>% 
+  unnest(c(data,hgt_pred,
+           rot_pred),
+         keep_empty = TRUE)
+
+lsc_pfdf  <- lsc_pfparams                               %>% 
+  unnest(c(data,sm_pred,
+           lf_pred,ca_pred),
+         keep_empty = TRUE)
+
+
+rthgt_pfintcpt <- rthgt_pfdf %>% filter(hgt_tidy.term=="(Intercept)")
+rthgt_pfslope  <- rthgt_pfdf %>% filter(hgt_tidy.term=="dia_base")
+
+lsc_pfintcpt <- lsc_pfdf  %>% filter(sm_tidy.term=="(Intercept)")
+lsc_pfslope <-  lsc_pfdf  %>% filter(sm_tidy.term %in% c("dia_base","height"))
+
+rthgt_pfslope <- rthgt_pfslope                          %>% 
+  dplyr::select(spcode,short,photo,growth,id,dia_base,
+                height,root,repro,agb,
+                rot_pred,hgt_pred,
+                hgt_tidy.estimate,rot_tidy.estimate)   %>% 
+  rename(hgt_slope = hgt_tidy.estimate,
+         rot_slope = rot_tidy.estimate)
+
+rthgt_pfintcpt <- rthgt_pfintcpt                       %>% 
+  dplyr::select(spcode,short,photo,
+                growth,id,hgt_tidy.estimate,
+                rot_tidy.estimate)        %>% 
+  rename(hgt_incpt = hgt_tidy.estimate,
+         rot_incpt = rot_tidy.estimate)
+
+lsc_pfslope  <- lsc_pfslope                             %>% 
+  dplyr::select(spcode,short,photo,
+                growth,id,stem,leaf,
+                carea,sm_pred,lf_pred,
+                ca_pred,sm_tidy.estimate,
+                sm_tidy.term,lf_tidy.estimate,
+                lf_tidy.term,ca_tidy.estimate,
+                ca_tidy.term)                 %>% 
+  pivot_wider(names_from  = sm_tidy.term,
+              values_from = c(sm_tidy.estimate,
+                              lf_tidy.estimate,
+                              ca_tidy.estimate),
+              names_sep   = ".")                         %>%
+  rename(dbh_sm = sm_tidy.estimate.dia_base,
+         hgt_sm = sm_tidy.estimate.height,
+         dbh_lf = lf_tidy.estimate.dia_base,
+         hgt_lf = lf_tidy.estimate.height,
+         dbh_ca = ca_tidy.estimate.dia_base,
+         hgt_ca = ca_tidy.estimate.height)               %>% 
+  group_by(growth,photo)                                %>% 
+  mutate(dbh_sm = unique(dbh_sm[!is.na(dbh_sm)]),
+         hgt_sm = unique(hgt_sm[!is.na(hgt_sm)]),
+         dbh_lf = unique(dbh_lf[!is.na(dbh_lf)]),
+         hgt_lf = unique(hgt_lf[!is.na(hgt_lf)]),
+         dbh_ca = unique(dbh_ca[!is.na(dbh_ca)]),
+         hgt_ca = unique(hgt_ca[!is.na(hgt_ca)]))        %>% 
+  ungroup()                                              %>% 
+  select(-c(lf_tidy.term,ca_tidy.term))                  %>% 
+  distinct()
+
+
+
+
+
+lsc_pfintcpt <- lsc_pfintcpt                              %>% 
+  dplyr::select(spcode,short,photo,growth,id,
+                sm_tidy.estimate,
+                lf_tidy.estimate, 
+                ca_tidy.estimate)            %>% 
+  rename(sm_incpt =  sm_tidy.estimate,
+         lf_incpt = lf_tidy.estimate,
+         ca_incpt = ca_tidy.estimate)
+
+lsc_pfall  = lsc_pfintcpt                               %>%  
+  left_join(lsc_pfslope,by=c("spcode","short",
+                           "photo","growth","id"))
+
+obs_pfpredic <- rthgt_pfslope                               %>% 
+  left_join(rthgt_pfintcpt, 
+            by=c("spcode","short","photo",
+                 "growth","id"))            %>% 
+  ungroup()
+
+obs_pfpredic <- obs_pfpredic                                %>% 
+  left_join(lsc_pfall,by=c("spcode","short","photo",
+                         "growth","id"))    %>% 
+  ungroup()
+
+## let's correct for intercept, see ref: 
+
+obs_pfpredic <- obs_pfpredic %>% group_by(growth,photo) %>% 
+  mutate(lf_n = length(!is.na(leaf)),
+         sm_n = length(!is.na(stem)),
+         rt_n = length(!is.na(root)),
+         hgt_n = length(!is.na(height)),
+         ca_n  = length(!is.na(carea)),
+         lf_sme = (leaf-lf_pred)*(leaf-lf_pred),
+         sm_sme = (stem-sm_pred)*(stem-sm_pred),
+         rt_sme = (root-rot_pred)*(root-rot_pred),
+         hgt_sme = (height-hgt_pred)*(height-hgt_pred),
+         ca_sme = (carea-ca_pred)*(carea-ca_pred))
+
+obs_pfpredic <- obs_pfpredic %>% mutate(lf_cf = sum(lf_sme, na.rm=TRUE)/(lf_n-2)/2,
+                                    sm_cf = sum(sm_sme,na.rm=TRUE)/(sm_n-3)/2,
+                                    rt_cf = sum(rt_sme, na.rm=TRUE)/(rt_n-2)/2,
+                                    hgt_cf = sum(hgt_sme, na.rm=TRUE)/(hgt_n-2)/2,
+                                    ca_cf = sum(ca_sme, na.rm=TRUE)/(ca_n-2)/2) %>% 
+  ungroup()
+
+
+obs_pfpredic <- obs_pfpredic %>% mutate(across(c("lf_incpt","hgt_incpt",
+                                             "sm_incpt","rot_incpt",
+                                             "ca_incpt","leaf","stem",
+                                             "root","carea","dia_base",
+                                             "height","lf_cf","sm_cf","rt_cf",
+                                             "hgt_cf","ca_cf"),exp))
+
+## update intercept
+obs_pfpredic <- obs_pfpredic %>% mutate(lf_incpt = lf_incpt*lf_cf,
+                                    hgt_incpt = hgt_incpt*hgt_cf,
+                                    sm_incpt = sm_incpt*sm_cf,
+                                    rot_incpt = rot_incpt*rt_cf,
+                                    ca_incpt = ca_incpt*ca_cf)
+
+## update prediction in un-logged form
+obs_pfpredic <- obs_pfpredic %>% group_by(growth,photo)             %>% 
+  mutate(lf_pred = lf_incpt*(dia_base^dbh_lf)*(height^hgt_lf),
+         hgt_pred = hgt_incpt*(dia_base^hgt_slope),
+         sm_pred = sm_incpt*(dia_base^dbh_sm)*(height^hgt_sm),
+         rt_pred = rot_incpt*(leaf^rot_slope),
+         ca_pred = ca_incpt*(dia_base^dbh_ca)*(height^hgt_ca)) %>% 
+  ungroup()
+
+## convert carbon to g
+
+obs_pfpredic <- obs_pfpredic %>% mutate(leaf = leaf*kg_2_g,
+                                    stem = stem*kg_2_g,
+                                    root = root*kg_2_g,
+                                    lf_pred = lf_pred*kg_2_g,
+                                    sm_pred = sm_pred*kg_2_g,
+                                    rot_pred = rot_pred*kg_2_g)
+
+allom_pfparams = obs_pfpredic             %>% 
+                 select(spcode
+                ,short
+                ,photo
+                ,growth
+                ,hgt_slope
+                ,rot_slope
+                ,hgt_incpt
+                ,rot_incpt
+                ,sm_incpt
+                ,lf_incpt
+                ,ca_incpt
+                ,dbh_sm
+                ,hgt_sm
+                ,dbh_lf
+                ,hgt_lf
+                ,dbh_ca
+                ,hgt_ca)        %>% 
+                distinct()
+
+
+## fit allometric equations for all grasses
+
+grass_df <- all_log %>% mutate(pft = "grass") %>% group_by(pft) %>% nest()
+grass_df <- grass_df %>% mutate(lf_mod = map(data, allom_lf),
+                                hgt_mod = map(data,allom_hgt),
+                                sm_mod = map(data,allom_stem),
+                                rot_mod = map(data,allom_rot),
+                                ca_mod = map(data,allom_ca),
+                                lf_pred = map2(.x=lf_mod, .y=data,~predict(object=.x,newdata=.y)),
+                                hgt_pred = map2(.x=hgt_mod, .y=data,~predict(object=.x,newdata=.y)),
+                                sm_pred = map2(.x=sm_mod, .y=data,~predict(object=.x,newdata=.y)),
+                                rot_pred = map2(.x=rot_mod, .y=data,~predict(object=.x,newdata=.y)),
+                                ca_pred = map2(.x=ca_mod, .y=data,~predict(object=.x,newdata=.y))) 
+
+##glance for model statistic
+grass_df <- grass_df %>% mutate(lf = map(lf_mod,broom::glance),
+                                hgt = map(hgt_mod,broom::glance),
+                                sm = map(sm_mod, broom::glance),
+                                rot = map(rot_mod, broom::glance),
+                                ca = map(ca_mod,broom::glance)) %>% 
+                         unnest(c(lf,hgt,sm,rot,ca), names_sep=".")
+
+grass_df <- grass_df %>% mutate(lf_tidy = map(lf_mod, broom::tidy),
+                                hgt_tidy = map(hgt_mod, broom::tidy),
+                                sm_tidy = map(sm_mod, broom::tidy),
+                                rot_tidy = map(rot_mod, broom::tidy),
+                                ca_tidy = map(ca_mod, broom::tidy))
+
+## flat model parameter tables
+rthgt_grassparams <- grass_df %>% dplyr::select(pft,data,hgt_tidy,
+                                                rot_tidy,hgt_pred,rot_pred) %>% 
+                                  unnest(c(hgt_tidy,rot_tidy),names_sep=".", 
+                                           keep_empty=TRUE)
+
+lsc_grassparams <- grass_df %>% dplyr::select(pft, data, sm_tidy,lf_tidy,
+                                           ca_tidy,sm_pred,lf_pred,ca_pred) %>% 
+                             unnest(c(sm_tidy,lf_tidy,ca_tidy),names_sep=".")
+
+
+rthgt_grassdf <- rthgt_grassparams                      %>% 
+                 unnest(c(data,hgt_pred,rot_pred),
+                        keep_empty = TRUE)
+
+lsc_grassdf  <- lsc_grassparams                         %>% 
+                unnest(c(data,sm_pred,lf_pred,ca_pred),
+                       keep_empty = TRUE)
+
+
+rthgt_grassintcpt <- rthgt_grassdf %>% filter(hgt_tidy.term=="(Intercept)")
+rthgt_grassslope  <- rthgt_grassdf %>% filter(hgt_tidy.term=="dia_base")
+
+lsc_grassintcpt <- lsc_grassdf  %>% filter(sm_tidy.term=="(Intercept)")
+lsc_grassslope <-  lsc_grassdf  %>% filter(sm_tidy.term %in% c("dia_base","height"))
+
+rthgt_grassslope <- rthgt_grassslope                   %>% 
+  dplyr::select(pft,id,dia_base,
+                height,root,repro,agb,
+                rot_pred,hgt_pred,
+                hgt_tidy.estimate,rot_tidy.estimate)   %>% 
+  rename(hgt_slope = hgt_tidy.estimate,
+         rot_slope = rot_tidy.estimate)
+
+rthgt_grassintcpt <- rthgt_grassintcpt                 %>% 
+  dplyr::select(pft,id,hgt_tidy.estimate,
+                rot_tidy.estimate)                     %>% 
+  rename(hgt_incpt = hgt_tidy.estimate,
+         rot_incpt = rot_tidy.estimate)
+
+lsc_grassslope  <- lsc_grassslope                      %>% 
+  dplyr::select(pft,id,stem,leaf,carea,sm_pred,lf_pred,
+                ca_pred,sm_tidy.estimate,
+                sm_tidy.term,lf_tidy.estimate,
+                lf_tidy.term,ca_tidy.estimate,
+                ca_tidy.term)                          %>% 
+  pivot_wider(names_from  = sm_tidy.term,
+              values_from = c(sm_tidy.estimate,
+                              lf_tidy.estimate,
+                              ca_tidy.estimate),
+              names_sep   = ".")                         %>%
+  rename(dbh_sm = sm_tidy.estimate.dia_base,
+         hgt_sm = sm_tidy.estimate.height,
+         dbh_lf = lf_tidy.estimate.dia_base,
+         hgt_lf = lf_tidy.estimate.height,
+         dbh_ca = ca_tidy.estimate.dia_base,
+         hgt_ca = ca_tidy.estimate.height)               %>% 
+  group_by(pft)                                          %>% 
+  mutate(dbh_sm = unique(dbh_sm[!is.na(dbh_sm)]),
+         hgt_sm = unique(hgt_sm[!is.na(hgt_sm)]),
+         dbh_lf = unique(dbh_lf[!is.na(dbh_lf)]),
+         hgt_lf = unique(hgt_lf[!is.na(hgt_lf)]),
+         dbh_ca = unique(dbh_ca[!is.na(dbh_ca)]),
+         hgt_ca = unique(hgt_ca[!is.na(hgt_ca)]))        %>% 
+  ungroup()                                              %>% 
+  select(-c(lf_tidy.term,ca_tidy.term))                  %>% 
+  distinct()
+
+
+
+
+
+lsc_grassintcpt <- lsc_grassintcpt                      %>% 
+  dplyr::select(pft,id,sm_tidy.estimate,
+                lf_tidy.estimate, 
+                ca_tidy.estimate)                       %>% 
+  rename(sm_incpt =  sm_tidy.estimate,
+         lf_incpt = lf_tidy.estimate,
+         ca_incpt = ca_tidy.estimate)
+
+lsc_grassall  = lsc_grassintcpt                             %>%  
+  left_join(lsc_grassslope,by=c("pft","id"))
+
+obs_grasspredic <- rthgt_grassslope                         %>% 
+                   left_join(rthgt_grassintcpt, 
+                             by=c("pft","id"))              %>% 
+                   ungroup()
+
+obs_grasspredic <- obs_grasspredic                          %>% 
+  left_join(lsc_grassall,by=c("pft","id"))                  %>% 
+  ungroup()
+
+## correct for intercept: 
+
+obs_grasspredic <- obs_grasspredic %>% group_by(pft) %>% 
+  mutate(lf_n = length(!is.na(leaf)),
+         sm_n = length(!is.na(stem)),
+         rt_n = length(!is.na(root)),
+         hgt_n = length(!is.na(height)),
+         ca_n  = length(!is.na(carea)),
+         lf_sme = (leaf-lf_pred)*(leaf-lf_pred),
+         sm_sme = (stem-sm_pred)*(stem-sm_pred),
+         rt_sme = (root-rot_pred)*(root-rot_pred),
+         hgt_sme = (height-hgt_pred)*(height-hgt_pred),
+         ca_sme = (carea-ca_pred)*(carea-ca_pred))
+
+obs_grasspredic <- obs_grasspredic %>% mutate(lf_cf = sum(lf_sme, na.rm=TRUE)/(lf_n-2)/2,
+                                              sm_cf = sum(sm_sme,na.rm=TRUE)/(sm_n-3)/2,
+                                              rt_cf = sum(rt_sme, na.rm=TRUE)/(rt_n-2)/2,
+                                              hgt_cf = sum(hgt_sme, na.rm=TRUE)/(hgt_n-2)/2,
+                                              ca_cf = sum(ca_sme, na.rm=TRUE)/(ca_n-2)/2) %>% 
+                                      ungroup()
+
+
+obs_grasspredic <- obs_grasspredic %>% mutate(across(c("lf_incpt","hgt_incpt",
+                                                       "sm_incpt","rot_incpt",
+                                                       "ca_incpt","leaf","stem",
+                                                       "root","carea","dia_base",
+                                                       "height","lf_cf","sm_cf","rt_cf",
+                                                       "hgt_cf","ca_cf"),exp))
+
+## update intercept
+obs_grasspredic <- obs_grasspredic %>% mutate(lf_incpt = lf_incpt*lf_cf,
+                                              hgt_incpt = hgt_incpt*hgt_cf,
+                                              sm_incpt = sm_incpt*sm_cf,
+                                              rot_incpt = rot_incpt*rt_cf,
+                                              ca_incpt = ca_incpt*ca_cf)
+
+## update prediction in un-logged form
+obs_grasspredic <- obs_grasspredic                                               %>%   
+                   mutate(lf_pred = lf_incpt*(dia_base^dbh_lf)*(height^hgt_lf),
+                          hgt_pred = hgt_incpt*(dia_base^hgt_slope),
+                          sm_pred = sm_incpt*(dia_base^dbh_sm)*(height^hgt_sm),
+                          rt_pred = rot_incpt*(leaf^rot_slope),
+                          ca_pred = ca_incpt*(dia_base^dbh_ca)*(height^hgt_ca)) 
+ 
+## convert carbon to g
+
+obs_grasspredic <- obs_grasspredic %>% mutate(leaf = leaf*kg_2_g,
+                                              stem = stem*kg_2_g,
+                                              root = root*kg_2_g,
+                                              lf_pred = lf_pred*kg_2_g,
+                                              sm_pred = sm_pred*kg_2_g,
+                                              rot_pred = rot_pred*kg_2_g)
+
+allom_grassparams = obs_grasspredic             %>% 
+                    select(pft
+                          ,hgt_slope
+                          ,rot_slope
+                          ,hgt_incpt
+                          ,rot_incpt
+                          ,sm_incpt
+                          ,lf_incpt
+                          ,ca_incpt
+                          ,dbh_sm
+                          ,hgt_sm
+                          ,dbh_lf
+                          ,hgt_lf
+                          ,dbh_ca
+                          ,hgt_ca)        %>% 
+                   distinct()
