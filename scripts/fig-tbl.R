@@ -220,6 +220,8 @@ rownames(sig_p) <- plot_nams
 
 
 f_output  = "fig2.pdf"
+COL2(diverging = c("RdBu", "BrBG", "PiYG", "PRGn", "PuOr", "RdYlBu"), n = 200)
+colors <- scales::alpha(colorRampPalette(c("#E57A77","white", "#7ca1cc"))(10), alpha = 1)
 
 #pdf(file = file.path(RESULTS,f_output),width = col1*1.5/300 , height= col1*0.85/300)
 pdf(file = file.path(RESULTS,f_output),width = col1 , height= col1*0.7)
@@ -228,10 +230,13 @@ fig2 = corrplot(corrs
         ,p.mat       = sig_p
         ,sig.level   = 0.05
         ,insig       = "label_sig"
-        ,pch.cex     = 1
+        #,insig       = "p-value"
+        ,pch.cex     = 1.5
+        ,pch.col     = "black"
         ,method      = "ellipse"
         ,type        = "lower"
         ,diag        =FALSE
+        ,col = colors
         #,addCoef.col = "grey50"
         ,mar         = c(0,0,1,0)
         ,order       = "original"
@@ -270,7 +275,7 @@ fig3 = ggplot(data=all, aes(photo,rt2lf))                     +
        scale_y_continuous(trans="log2"
                      ,breaks=breaks_log(n=6)
                      ,labels=number_format(accuracy=0.01))    +
-       scale_fill_manual(values=schwilkcolors[c(1,4)])        +
+       scale_fill_manual(values=c("#E57A77","#7CA1CC"))       +
        pubtheme.nogridlines                                   +
        theme(legend.position = "right"
             ,legend.title    = element_blank())               +
@@ -290,11 +295,11 @@ fig4   = ggplot(data=repro_df,aes(grate,repro_ave, color=growth))          +
          geom_point(shape=16,size=0.8)                                     +
          geom_smooth(data=repro_fit,method="lm",se=FALSE,color="black")    +
          #scale_color_brewer(palette="Paired")                              +
-         scale_color_manual(values = schwilkcolors[c(1,4)])                +
+         scale_color_manual(values = c("#E57A77","#7CA1CC"))               +
          pubtheme.nogridlines                                              +
          theme(legend.position = "right"
               ,legend.title = element_blank())                             +
-         labs(x="Total biomass growth rate"
+         labs(x=expression("Total biomass growth rate"~"("~g~day^-1~")")
              ,y="Reproductive allocation")                                 +
          guides(colour = guide_legend( ncol=1))
                                 #,label.theme = element_text(face="italic")))
@@ -306,7 +311,7 @@ ggsave(fig4, file = file.path(RESULTS, "fig4.jpeg"), width = col1 , height= 0.7*
 ####### Fig5. Biomass partition between stem and foliage #######
 fig5   = ggplot(data=all,aes(sla,lf2sm,colour=hgroup))                    +
          geom_point(shape=16,size=0.8,alpha=0.6)                          +
-         scale_color_manual(values=schwilkcolors[c(1,4,5)]
+         scale_color_manual(values=c("#E57A77","#A8B6CC","#7CA1CC")
                            ,labels=parse_format())                        +
          geom_smooth(data=lfsm_fit,method="lm",se=FALSE)                  +
          scale_x_continuous(trans="log2"
