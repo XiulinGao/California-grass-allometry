@@ -173,13 +173,13 @@ fig1 = fig1a + fig1b + fig1c + fig1d + fig1e                      +
        plot_annotation(tag_levels = 'a') &
        theme(plot.margin = unit(c(4, 4, 4, 4), "pt"),
              plot.tag.position = c(0, 1),
-             plot.tag = element_text(hjust = -2, vjust = 0.4, size = smsize+1),
+             plot.tag = element_text(hjust = -2, vjust = 0.4, size = Ltextsize),
              legend.title = element_blank())
 fig1
 
 #ggsave(fig1, file = file.path(RESULTS, "fig1_unlog.pdf"), width = col2*1.8 , height= col2, 
 #       units="cm", dpi = 350)
-ggsave(fig1, file = file.path(RESULTS, "fig1_unlog.jpeg"), width = col2 , height= 0.7*col2, 
+ggsave(fig1, file = file.path(RESULTS, "fig1_unlog.tiff"), width = col2 , height= 0.7*col2, 
        units="cm", dpi = 600)
 
 
@@ -241,7 +241,7 @@ fig2 = corrplot(corrs
         ,mar         = c(0,0,1,0)
         ,order       = "original"
         #,number.cex  = 0.25
-        ,tl.cex      = 1
+        ,tl.cex      = 1.3
         ,tl.col      = "black"
         ,cl.cex      = 1)
 dev.off()
@@ -275,7 +275,7 @@ fig3 = ggplot(data=all, aes(photo,rt2lf))                     +
        scale_y_continuous(trans="log2"
                      ,breaks=breaks_log(n=6)
                      ,labels=number_format(accuracy=0.01))    +
-       scale_fill_manual(values=c("#E57A77","#7CA1CC"))       +
+       scale_fill_manual(values=c("#D53E4F","#ABD9E9"))       +
        pubtheme.nogridlines                                   +
        theme(legend.position = "right"
             ,legend.title    = element_blank())               +
@@ -283,7 +283,7 @@ fig3 = ggplot(data=all, aes(photo,rt2lf))                     +
        
 fig3
 
-ggsave(fig3, file = file.path(RESULTS, "fig3.jpeg"), width = col1 , height= 0.7*col1, 
+ggsave(fig3, file = file.path(RESULTS, "fig3.tiff"), width = col1 , height= 0.7*col1, 
        units="cm", dpi = 600) 
 
 
@@ -295,23 +295,23 @@ fig4   = ggplot(data=repro_df,aes(grate,repro_ave, color=growth))          +
          geom_point(shape=16,size=0.8)                                     +
          geom_smooth(data=repro_fit,method="lm",se=FALSE,color="black")    +
          #scale_color_brewer(palette="Paired")                              +
-         scale_color_manual(values = c("#E57A77","#7CA1CC"))               +
+         scale_color_manual(values = c("#D53E4F","#ABD9E9"))               +
          pubtheme.nogridlines                                              +
          theme(legend.position = "right"
               ,legend.title = element_blank())                             +
-         labs(x=expression("Total biomass growth rate"~"("~g~day^-1~")")
+         labs(x=expression("Total biomass growth rate"~"("~Ln(kg)~day^-1~")")
              ,y="Reproductive allocation")                                 +
          guides(colour = guide_legend( ncol=1))
                                 #,label.theme = element_text(face="italic")))
 fig4
 
-ggsave(fig4, file = file.path(RESULTS, "fig4.jpeg"), width = col1 , height= 0.7*col1, 
+ggsave(fig4, file = file.path(RESULTS, "fig4.tiff"), width = col1 , height= 0.7*col1, 
        units="cm", dpi =600) 
 
 ####### Fig5. Biomass partition between stem and foliage #######
 fig5   = ggplot(data=all,aes(sla,lf2sm,colour=hgroup))                    +
          geom_point(shape=16,size=0.8,alpha=0.6)                          +
-         scale_color_manual(values=c("#E57A77","#A8B6CC","#7CA1CC")
+         scale_color_manual(values=c("#D53E4F","#A8B6CC","#ABD9E9")
                            ,labels=parse_format())                        +
          geom_smooth(data=lfsm_fit,method="lm",se=FALSE)                  +
          scale_x_continuous(trans="log2"
@@ -329,6 +329,6 @@ fig5   = ggplot(data=all,aes(sla,lf2sm,colour=hgroup))                    +
 
 fig5
 
-ggsave(fig5, file = file.path(RESULTS, "fig5.jpeg"), width = col1, height= 0.7*col1, 
+ggsave(fig5, file = file.path(RESULTS, "fig5.tiff"), width = col1, height= 0.7*col1, 
        units="cm", dpi = 600)       
 

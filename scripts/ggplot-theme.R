@@ -13,28 +13,30 @@ schwilkcolors <- c("#A0AE6A", "#836B43", "#D68D18", "#437683", "#18B0D6")
 
 ## The ggplot theme for all figures.
 bestfit <- geom_smooth(method="lm",se = F, color = "black", size=1.5)
-textsize <- 10
-smsize <- textsize-3
+Ltextsize <- 10
+axis_label_txsz <- 8.5
+#axis_tick_txsz <- 6.5
+smsize <- Ltextsize-3.5
 pt2mm <- 0.35146
 smsize.mm <- smsize*pt2mm
-fontfamily = "ArialMT"
+fontfamily = "Times"
 #fontfamily = "Arial"
 col2 <- 18  # cm
 col1 <- 8.5 # cm #according to https://www.esa.org/wp-content/uploads/2022/05/ESA-Manuscript-Preparation-Guide.pdf
 pubtheme   <-  theme_grey() +
              theme(axis.title.y = element_text(family=fontfamily,
-                   size = textsize, angle = 90, vjust=0.3),
-               axis.title.x = element_text(family=fontfamily, size = textsize, vjust=-0.3),
+                   size = Ltextsize, angle = 90, vjust=0.3),
+               axis.title.x = element_text(family=fontfamily, size = Ltextsize, vjust=-0.3),
                axis.ticks = element_line(colour = "black"),
                panel.background = element_rect(size = 1.6, fill = NA),
                panel.border = element_rect(size = 1.6, fill=NA),
                axis.text.x  = element_text(family=fontfamily, size=smsize, color="black"),
                axis.text.y  = element_text(family=fontfamily, size=smsize, color = "black"),
-               strip.text.x = element_text(family=fontfamily, size = textsize), #, face="italic"),
-               strip.text.y = element_text(family=fontfamily, size = textsize), #, face="italic"),
+               strip.text.x = element_text(family=fontfamily, size = axis_label_txsz), #, face="italic"),
+               strip.text.y = element_text(family=fontfamily, size = axis_label_txsz), #, face="italic"),
            #   strip.background = element_blank(),
-               legend.title = element_text(family=fontfamily, size=textsize),
-               legend.text = element_text(family=fontfamily, size=smsize),
+               legend.title = element_text(family=fontfamily, size=Ltextsize),
+               legend.text = element_text(family=fontfamily, size=axis_label_txsz-1.5),
                legend.key = element_rect(fill=NA),
                legend.background = element_rect(fill="transparent"),
                panel.grid.major = element_line(colour = "grey90", size = 0.2),
