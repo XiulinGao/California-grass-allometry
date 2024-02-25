@@ -205,9 +205,9 @@ cor_df = obs_predic                %>%
         left_join(sla,by="spcode") %>% 
         select(-spcode)
 
-plot_nams = c( "$ H[dbh-exp]", "$ Frt[lf-exp]", "$ Stem[dbh-exp]"
-             , "$ Stem[hgt-exp]", "$ Leaf[dbh-exp]", "$ Leaf[hgt-exp]"
-             , "$ CanA[dbh-exp]", "$ CanA[hgt-exp]", "$ H[coef]"
+plot_nams = c( "$ H[bd-exp]", "$ Frt[lf-exp]", "$ Stem[bd-exp]"
+             , "$ Stem[hgt-exp]", "$ Leaf[bd-exp]", "$ Leaf[hgt-exp]"
+             , "$ CanA[bd-exp]", "$ CanA[hgt-exp]", "$ H[coef]"
              , "$ Frt[coef]", "$ Stem[coef]","$ Leaf[coef]"
              , "$ CanA[coef]", "SLA")       
 corrs     = cor(cor_df)
@@ -219,31 +219,31 @@ colnames(sig_p) <- plot_nams
 rownames(sig_p) <- plot_nams
 
 
-f_output  = "fig2.pdf"
+f_output  = "fig2.tiff"
 COL2(diverging = c("RdBu", "BrBG", "PiYG", "PRGn", "PuOr", "RdYlBu"), n = 200)
 colors <- scales::alpha(colorRampPalette(c("#E57A77","white", "#7ca1cc"))(10), alpha = 1)
 
 #pdf(file = file.path(RESULTS,f_output),width = col1*1.5/300 , height= col1*0.85/300)
-pdf(file = file.path(RESULTS,f_output),width = col1 , height= col1*0.7)
+tiff(file = file.path(RESULTS,f_output),width = col1 , height= col1*0.7, units="cm",res=600)
 par(family=fontfamily)
 fig2 = corrplot(corrs
         ,p.mat       = sig_p
         ,sig.level   = 0.05
         ,insig       = "label_sig"
         #,insig       = "p-value"
-        ,pch.cex     = 1.5
+        ,pch.cex     = 0.7
         ,pch.col     = "black"
         ,method      = "ellipse"
         ,type        = "lower"
         ,diag        =FALSE
         ,col = colors
         #,addCoef.col = "grey50"
-        ,mar         = c(0,0,1,0)
+        #,mar         = c(0,0,1,0)
         ,order       = "original"
         #,number.cex  = 0.25
-        ,tl.cex      = 1.3
+        ,tl.cex      = 0.6
         ,tl.col      = "black"
-        ,cl.cex      = 1)
+        ,cl.cex      = 0.5)
 dev.off()
  
 ####### Fig3. root allocation between annual perennial C3 C4 #######
